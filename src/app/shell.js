@@ -1,0 +1,196 @@
+import { delegate } from '../utils/dom.js';
+import {
+  goBack,
+  navigate,
+  parseRoute,
+  subscribe as subscribeRoute,
+} from '../utils/navigation.js';
+import { getState, subscribe as subscribeStore } from '../state/store.js';
+import {
+  getPlayerState,
+  next,
+  playTrack,
+  previous,
+  subscribe as subscribePlayer,
+  toggle,
+} from '../state/player.js';
+import { findAlbum, findPlaylist, findTrack } from '../data/library.js';
+import { miniPlayer } from '../components/mini-player.js';
+import { navigation, setActiveNavigation } from '../components/navigation.js';
+import { homePage } from '../pages/home.js';
+import { libraryPage } from '../pages/library.js';
+import { playlistsPage } from '../pages/playlists.js';
+import { playlistPage } from '../pages/playlist.js';
+import { albumPage } from '../pages/album.js';
+import { playerPage } from '../pages/player.js';
+import { settingsPage } from '../pages/settings.js';
+import { notFoundPage } from '../pages/not-found.js';
+
+const PAGES = {
+  home: homePage,
+  library: libraryPage,
+  playlists: playlistsPage,
+  playlist: playlistPage,
+  album: albumPage,
+  player: playerPage,
+  settings: settingsPage,
+  notFound: notFoundPage,
+};
+
+const BRAND_MARK = `<svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true" focusable="false">
+  <circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width="1.4" opacity="0.55"/>
+  <circle cx="16" cy="16" r="3" fill="currentColor"/>
+  <path d="M16 4v12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+</svg>`;
+
+function shellMarkup({ demo }) {
+  return `<div class="app${demo ? ' app--demo' : ''}">
+    <header class="app-header">
+      <a class="brand" href="#/" aria-label="Cinematic Music — home">
+        <span class="brand__mark" aria-hidden="true">${BRAND_MARK}</span>
+        <span class="brand__text">
+          <span class="brand__name">Cinematic</span>
+          <span class="brand__sub">Music</span>
+        </span>
+      </a>
+      ${demo ? `<span class="dev-chip" role="status" title="Development preview: sample albums, no imported music"><span class="dev-chip__dot" aria-hidden="true"></span>Dev preview</span>` : ''}
+    </header>
+
+    <main id="app-main" class="app-main" tabindex="-1"></main>
+
+    <div class="mini-player-slot" data-role="mini-player-slot"></div>
+
+    ${navigation()}
+  </div>`;
+}
+
+export function mountShell(root) {
+  root.innerHTML = shellMarkup(getState());
+
+  const main = root.querySelector('#app-main');
+  const miniSlot = root.querySelector('[data-role="mini-player-slot"]');
+
+  let cleanup = null;
+
+  function renderMiniPlayer() {
+    const playerState = getPlayerState();
+    miniSlot.innerHTML = miniPlayer(playerState);
+    const bar = miniSlot.querySelector('[data-role="mini-progress"]');
+    if (bar && playerState.duration > 0) {
+      bar.style.width = `${Math.min(100, (playerState.position / playerState.duration) * 100).toFixed(2)}%`;
+    }
+  }
+
+  function renderRoute({ focus = true } = {}) {
+    const route = parseRoute();
+    const state = getState();
+    const page = PAGES[route.name] ?? notFoundPage;
+
+    if (typeof cleanup === 'function') cleanup();
+    cleanup = null;
+
+    main.innerHTML = page.render(state, route);
+    cleanup = page.mount?.(main, { state, route }) ?? null;
+
+    setActiveNavigation(route.name);
+    const heading = main.querySelector('h1');
+    const title = heading?.textContent?.trim() || page.title;
+    document.title = title ? `${title} · Cinematic Music` : 'Cinematic Music';
+    window.scrollTo(0, 0);
+
+    if (focus) {
+      requestAnimationFrame(() => {
+        const target = main.querySelector('h1') ?? main;
+        target?.focus?.({ preventScroll: true });
+      });
+    }
+  }
+
+  renderMiniPlayer();
+  renderRoute({ focus: false });
+
+  subscribeRoute(() => renderRoute({ focus: true }));
+
+  subscribeStore(() => {
+    renderMiniPlayer();
+    renderRoute({ focus: false });
+  });
+
+  subscribePlayer(({ type, state: playerState }) => {
+    if (type === 'track') {
+      renderMiniPlayer();
+      // When the full-screen player is open it owns the current track's
+      // artwork, title and palette, so re-render that route in place.
+      if (parseRoute().name === 'player') renderRoute({ focus: false });
+      return;
+    }
+    if (type === 'state') {
+      renderMiniPlayer();
+      return;
+    }
+    if (type === 'progress') {
+      const bar = miniSlot.querySelector('[data-role="mini-progress"]');
+      if (bar && playerState.duration > 0) {
+        bar.style.width = `${Math.min(100, (playerState.position / playerState.duration) * 100).toFixed(2)}%`;
+      }
+    }
+  });
+
+  delegate(root, 'click', '[data-action]', (event, element) => {
+    const action = element.dataset.action;
+    if (!action) return;
+
+    if (action === 'toggle-play') {
+      event.preventDefault();
+      toggle();
+      return;
+    }
+    if (action === 'next') {
+      next();
+      return;
+    }
+    if (action === 'previous') {
+      previous();
+      return;
+    }
+    if (action === 'close-player') {
+      goBack('/');
+      return;
+    }
+    if (action === 'play-track') {
+      const trackId = element.dataset.trackId;
+      if (!trackId) return;
+      const scope = element.closest('[data-queue]');
+      const ids = scope
+        ? Array.from(scope.querySelectorAll('[data-track-id]')).map((node) => node.dataset.trackId)
+        : [trackId];
+      const tracks = ids
+        .map((id) => findTrack(getState().library, id))
+        .filter(Boolean);
+      playTrack(tracks, trackId);
+      navigate('/now-playing');
+      return;
+    }
+    if (action === 'play-album') {
+      const album = findAlbum(getState().library, element.dataset.albumId);
+      if (!album || album.tracks.length === 0) return;
+      playTrack(album.tracks, album.tracks[0].id);
+      navigate('/now-playing');
+      return;
+    }
+    if (action === 'play-playlist') {
+      const playlist = findPlaylist(getState().library, element.dataset.playlistId);
+      if (!playlist || playlist.tracks.length === 0) return;
+      playTrack(playlist.tracks, playlist.tracks[0].id);
+      navigate('/now-playing');
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    if (document.querySelector('dialog[open]')) return;
+    if (parseRoute().name === 'player') {
+      goBack('/');
+    }
+  });
+}

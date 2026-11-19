@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" role="img" aria-label="Abstract artwork: Aurora Drift">
+  <defs>
+    <radialGradient id="bg" cx="28%" cy="16%" r="98%">
+      <stop offset="0" stop-color="#2a2058" />
+      <stop offset="0.55" stop-color="#151331" />
+      <stop offset="1" stop-color="#080a14" />
+    </radialGradient>
+    <linearGradient id="beam" x1="120" y1="60" x2="700" y2="740" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#a78bfa" />
+      <stop offset="0.45" stop-color="#7c6bff" stop-opacity="0.85" />
+      <stop offset="1" stop-color="#22d3ee" stop-opacity="0.35" />
+    </linearGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="46" />
+    </filter>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" stitchTiles="stitch" />
+      <feColorMatrix type="saturate" values="0" />
+      <feComponentTransfer><feFuncA type="linear" slope="0.55" /></feComponentTransfer>
+    </filter>
+  </defs>
+
+  <rect width="800" height="800" fill="url(#bg)" />
+
+  <g filter="url(#soft)">
+    <ellipse cx="250" cy="240" rx="230" ry="180" fill="#7c6bff" opacity="0.55" />
+    <ellipse cx="590" cy="540" rx="230" ry="260" fill="#22d3ee" opacity="0.16" />
+    <ellipse cx="420" cy="700" rx="300" ry="150" fill="#a78bfa" opacity="0.22" />
+  </g>
+
+  <g fill="none" stroke="url(#beam)">
+    <path d="M-40 620C160 520 260 300 440 250c120-34 250 30 400 120" stroke-width="2.5" opacity="0.9" />
+    <path d="M-40 686C180 574 300 360 470 310c120-34 230 20 370 96" stroke-width="1.2" opacity="0.45" />
+    <path d="M-40 560C140 470 250 270 430 214c114-34 236 24 410 140" stroke-width="1" opacity="0.3" />
+  </g>
+
+  <circle cx="560" cy="250" r="4" fill="#f4f1f8" opacity="0.85" />
+  <circle cx="648" cy="322" r="2" fill="#f4f1f8" opacity="0.5" />
+  <circle cx="212" cy="560" r="2.5" fill="#c4b5fd" opacity="0.6" />
+
+  <rect width="800" height="800" filter="url(#grain)" opacity="0.12" style="mix-blend-mode: overlay" />
+</svg>
