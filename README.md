@@ -58,9 +58,9 @@ npm run android:debug         # build + sync + ./gradlew assembleDebug
 
 Environment note: the machines used so far had **no JDK and no Android SDK**, so no APK has
 been built locally. A `Build` GitHub Actions workflow (web build + Android debug build) is written
-but **not yet active**: it sits at `docs/ci/build.yml` because the token used to push could not
-create files under `.github/workflows/`. Move it there (instructions in the file) to enable CI;
-until it has run, no Android build has been verified by anyone. See [docs/TESTING.md](docs/TESTING.md) for exactly what was and was not verified.
+but **not yet active**: it sits at `docs/ci/build.yml` because the token used to push has no
+permission to create files under `.github/workflows/`. Move it there (instructions in the
+file's header) to enable CI; until it has run, no Android build has been verified by anyone. See [docs/TESTING.md](docs/TESTING.md) for exactly what was and was not verified.
 
 ### Tests and CI
 
@@ -70,8 +70,9 @@ npm run verify   # tests + production build
 ```
 
 Browser flow check for Now Playing: `tests/e2e/now-playing.mjs` (needs Playwright, see the
-header of that file). Once enabled, CI runs `npm ci`, `npm test`, `npm run build`, then on Android:
-`cap sync`, `testDebugUnitTest`, `assembleDebug` and `assembleDebugAndroidTest`.
+header of that file). Once enabled, CI runs `npm ci`, `npm test`, `npm run build`, the browser E2E, then on Android:
+`cap sync`, `testDebugUnitTest`, `assembleDebug`, `assembleDebugAndroidTest`, and an `aapt2`
+inspection of the built APK (package, version, permissions, backup flag).
 
 ### Versioning, privacy and security
 

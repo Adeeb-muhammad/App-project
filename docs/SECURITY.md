@@ -5,16 +5,37 @@ music and keep private playlists, so V1 defaults to **nothing leaves the device*
 
 ## Backup policy
 
-| Mechanism | Setting | Where |
-|---|---|---|
-| Auto Backup (Android ≤ 11) | `android:allowBackup="false"` | `AndroidManifest.xml` |
-| Legacy full-backup rules | `android:fullBackupContent="false"` | `AndroidManifest.xml` |
-| Android 12+ cloud backup **and** device-to-device transfer | every domain excluded | `res/xml/data_extraction_rules.xml` |
+| Mechanism | What it covers | Setting | Where |
+|---|---|---|---|
+| `android:allowBackup` | All backup on API 24-30; documented by Android as disabling cloud backup **and** device-to-device (D2D) transfer on every version, but Android also warns some OEMs cannot disable D2D migration | `"false"` | `AndroidManifest.xml` |
+| `android:dataExtractionRules` (API 31+) | Cloud backup (`<cloud-backup>`) and D2D transfer (`<device-transfer>`), configured separately | every domain excluded in both sections | `res/xml/data_extraction_rules.xml` |
+| `android:fullBackupContent` | Legacy cloud backup rules (API <= 30) | **not set** - redundant once `allowBackup="false"` | - |
+
+The rules file excludes all nine documented domains (`root`, `file`, `database`,
+`sharedpref`, `external`, `device_root`, `device_file`, `device_database`,
+`device_sharedpref`), each with `path="."` (the documented "whole domain" form), in both
+sections, and contains no `<include>`. The `device_*` domains are device-protected storage
+and are only defined by the Android 12+ `data-extraction-rules` format, not by the legacy
+`full-backup-content` format, which is why they appear here and nowhere else. This app does
+not use device-protected storage (no `directBootAware` components), so those four lines are
+defence in depth, not a fix for a known leak.
+
+Why both layers: Lint documents `allowBackup`/`fullBackupContent` as applying only to cloud
+backup on Android 12+, while the manifest reference says `allowBackup="false"` also stops D2D.
+The sources disagree, so the rules file states the policy explicitly instead of relying on
+either reading.
+
+What is verified: the XML is well-formed and `tests/android-policy.test.js` asserts the
+source files (every domain excluded in both sections, no `<include>`, `allowBackup="false"`,
+rules referenced). It was confirmed to fail when a line is removed. **Not verified:** that a
+real device actually skips this app during `bmgr` cloud backup or D2D migration, and that the
+Android toolchain accepts the file (never compiled). `adb shell bmgr` / a D2D migration on
+Android 12+ hardware is the check still owed.
 
 Consequence: reinstalling or migrating to a new phone does **not** restore the library
 database or playlists. A deliberate, user-initiated local export/import is planned for a
-later release (see `DEVELOPMENT_ROADMAP.md`). Future persistent data (SQLite, playlists)
-must stay inside these exclusions unless that feature is designed explicitly.
+later release. Future persistent data must stay inside these exclusions unless that feature
+is designed explicitly.
 
 ## Permissions
 
@@ -24,10 +45,15 @@ must stay inside these exclusions unless that feature is designed explicitly.
   analytics, remote artwork or backend. Fonts and artwork are bundled.
   Trade-off: `cap run --live-reload` against a dev server needs a temporary INTERNET
   permission in a *debug-only* manifest; do not add it to `main`.
-- The manifest declares **no** `uses-permission` at all. Storage/audio permissions will be
+- The **source** manifest declares no `uses-permission`. Storage/audio permissions will be
   added with the import feature (prefer the Storage Access Framework, which needs none).
-- Guarded by `AppPackageInstrumentedTest` (device; never run yet) and a manifest check in the
-  CI workflow (inactive until moved to `.github/workflows/`).
+  The **merged** manifest may still contain an app-private
+  `<package>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` entry that AndroidX Core adds; that is
+  expected and is not network or storage access. This is from knowledge of AndroidX, not yet
+  observed in a built APK here; the CI APK-inspection step fails on any other permission.
+- Guarded by `AppPackageInstrumentedTest` (device; never run yet) and an `aapt2` inspection of the
+  built debug APK in the CI workflow (`docs/ci/build.yml`, inactive until moved to
+  `.github/workflows/`).
 
 ## FileProvider
 

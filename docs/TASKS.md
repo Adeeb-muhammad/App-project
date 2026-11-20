@@ -71,8 +71,10 @@ Last updated at the end of the Milestone 1 hardening session (project version 0.
 
 ## Hardening session (branch `claude/milestone-1-hardening`)
 
-- [x] Confirmed PR #1 was **not merged**; `main` is README-only. Work is based on the
-      `freebuff/7c4ab9b5b46fa71777e346ea` branch.
+- [x] Branch history (verified in the integration session): PR #1 *was* merged into `main`
+      (`007bc56`). PR #2 (hardening) was merged only into the old
+      `freebuff/7c4ab9b5b46fa71777e346ea` branch (`0bcf4db`), **not** into `main`, so `main`
+      lacked all hardening until the integration PR (`claude/final-hardening-integration`).
 - [x] Android test package mismatch fixed: tests now live in `com.personal.cinematicmusic`
       and assert the real application id, backup flag, absence of INTERNET and version name
       format (`AppPackageInstrumentedTest`); template unit test replaced by `VersionPolicyTest`.
@@ -86,11 +88,25 @@ Last updated at the end of the Milestone 1 hardening session (project version 0.
       boundary.
 - [x] `src/utils/safe.js`: hex-only colours, local-only artwork sources; all palette/artwork
       call sites migrated; library filters tolerate non-string metadata.
-- [x] 16 unit tests (`npm test`) and a 39-check Playwright run of the full Now Playing flow
+- [x] 21 unit/policy tests (`npm test`) and a 39-check Playwright run of the full Now Playing flow
       against a production build (see `TESTING.md`).
-- [ ] CI: workflow written (web + Android jobs) but **not active and never run**. It is at
-      `docs/ci/build.yml`; the push token lacked `workflow` scope. Move it to
-      `.github/workflows/build.yml` and confirm the first run.
+- [ ] CI: workflow written (web, e2e, Android jobs), validated with actionlint, but **not
+      active and never run**. It is at `docs/ci/build.yml`; the push token has no workflow
+      permission. Move it to `.github/workflows/build.yml` and confirm the first run; expect
+      to iterate on the Android and e2e jobs.
+
+## Integration session (branch `claude/final-hardening-integration`)
+
+- [x] Integrated the hardening into the `main` lineage with a `--no-ff` merge (no history
+      rewritten, no force-push).
+- [x] Backup rules completed: explicit `path="."`, all nine domains incl. `device_*` in both
+      sections, redundant `fullBackupContent` removed; policy test added.
+- [x] Review fixes: dead code removed from `safe.js`; fallback artwork no longer splits
+      emoji; documented that `safeImageSrc` will need an explicit rule for
+      `Capacitor.convertFileSrc` URLs when local artwork is added.
+- [x] Corrected docs that overstated "no permissions" (source vs merged manifest).
+- [ ] Android build could not be attempted: Google Maven, Maven Central and
+      services.gradle.org are unreachable from the working environment.
 
 ## Not verified / incomplete
 
