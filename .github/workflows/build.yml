@@ -100,7 +100,7 @@ jobs:
           # Media playback needs a foreground service, its mediaPlayback type,
           # notifications and a wake lock. Anything else (especially storage) is a failure.
           UNEXPECTED=$(echo "$BADGING" | grep "^uses-permission" \
-            | grep -vE "(DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION|android.permission.FOREGROUND_SERVICE$|android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK|android.permission.POST_NOTIFICATIONS|android.permission.WAKE_LOCK)" || true)
+            | grep -vE "(DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION|android.permission.FOREGROUND_SERVICE'|android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK|android.permission.POST_NOTIFICATIONS|android.permission.WAKE_LOCK)" || true)
           if [ -n "$UNEXPECTED" ]; then echo "Unexpected permissions:"; echo "$UNEXPECTED"; exit 1; fi
           TREE=$("$AAPT2" dump xmltree --file AndroidManifest.xml "$APK")
           echo "$TREE" | grep -E "allowBackup|dataExtractionRules|fullBackupContent" || true
