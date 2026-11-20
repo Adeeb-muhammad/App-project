@@ -12,6 +12,7 @@ export function artwork(media, { className = '', alt = '', eager = false } = {})
   if (src) {
     return `<img class="artwork ${className}" src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" style="${style}" ${eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" />`;
   }
-  const initial = escapeHtml(String(media?.title ?? media?.name ?? '?').trim().charAt(0).toUpperCase() || '?');
+  // Array.from keeps surrogate pairs (emoji, CJK extensions) intact; charAt(0) would not.
+  const initial = escapeHtml(Array.from(String(media?.title ?? media?.name ?? '?').trim())[0]?.toUpperCase() || '?');
   return `<span class="artwork artwork--fallback ${className}" style="${style}" aria-hidden="true">${initial}</span>`;
 }

@@ -1,5 +1,3 @@
-import { escapeHtml } from './dom.js';
-
 /**
  * Data-boundary helpers for values that end up inside CSS or URL attributes.
  *
@@ -40,6 +38,11 @@ export function glowStyle(palette) {
  * same-origin relative paths, blob: URLs and raster data: URLs.
  * Anything else (remote hosts, javascript:, protocol-relative, SVG data) is
  * rejected so artwork can never trigger a network request.
+ *
+ * Note for the future importer: Capacitor.convertFileSrc() returns
+ * `https://localhost/_capacitor_file_/...` URLs, which this function rejects on
+ * purpose. When local-file artwork is added, allow exactly that origin+prefix
+ * here (and add a test) rather than loosening the scheme check.
  */
 export function safeImageSrc(value) {
   if (typeof value !== 'string') return null;
@@ -51,12 +54,3 @@ export function safeImageSrc(value) {
   if (/^[a-z][a-z0-9+.-]*:/i.test(src)) return null;
   return src;
 }
-
-/** Coerces untrusted metadata to a display string (never throws). */
-export function text(value, fallback = '') {
-  if (value === null || value === undefined) return fallback;
-  const result = String(value);
-  return result.length > 0 ? result : fallback;
-}
-
-export { escapeHtml };

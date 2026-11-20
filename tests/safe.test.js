@@ -34,3 +34,9 @@ test('artwork() escapes hostile titles and falls back without a valid src', () =
   assert.ok(!html.includes('evil.test'), html);
   assert.equal(escapeHtml('<"&\'>'), '&lt;&quot;&amp;&#39;&gt;');
 });
+
+test('fallback artwork keeps an emoji initial intact (no lone surrogate)', () => {
+  const html = artwork({ title: '😀 Party', palette: [] });
+  assert.ok(html.includes('>😀<'), html);
+  assert.ok(!/[\ud800-\udbff](?![\udc00-\udfff])/.test(html), 'lone high surrogate');
+});

@@ -3,7 +3,6 @@
 
     <application
         android:allowBackup="false"
-        android:fullBackupContent="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -27,5 +26,6 @@
         </activity>
     </application>
 
-    <!-- Intentionally no <uses-permission>: the V1 app is fully offline. See docs/SECURITY.md. -->
+    <!-- Intentionally no <uses-permission> in this source manifest: the V1 app is fully offline.
+         Libraries may add app-private entries to the merged manifest; see docs/SECURITY.md. -->
 </manifest>

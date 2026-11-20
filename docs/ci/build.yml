@@ -1,13 +1,16 @@
-# NOT ACTIVE YET: GitHub only runs workflows under .github/workflows/. The token used to
-# prepare this branch had no `workflow` scope, so it could not be pushed there. Activate with:
-#   mkdir -p .github/workflows && git mv docs/ci/build.yml .github/workflows/build.yml
-# (then remove these four comment lines). It has never been executed by GitHub.
+# NOT ACTIVE: GitHub only runs workflows under .github/workflows/. The access token used to
+# prepare this branch has no `workflow` permission, so the file could not be pushed there.
+# Activate it (needs your own account, e.g. the GitHub web UI "rename/move file" or a token
+# with workflow permission):  git mv docs/ci/build.yml .github/workflows/build.yml
+# then delete these comment lines. It validates with actionlint but has NEVER been run by GitHub.
 name: Build
 
 on:
   push:
     branches: [main, 'claude/**']
   pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -20,6 +23,7 @@ jobs:
   web:
     name: Web (unit tests + Vite build)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,10 +34,35 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  android:
-    name: Android (debug APK + test compilation)
+  e2e:
+    name: Browser E2E (Now Playing flow)
     runs-on: ubuntu-latest
     needs: web
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # Playwright is a test-only tool, deliberately not a project dependency.
+      - name: Install Playwright (pinned, not saved to package.json)
+        run: |
+          npm install --no-save --no-package-lock playwright@1.63.0
+          npx playwright install --with-deps chromium
+      - name: Serve production build
+        run: |
+          npx vite preview --port 4173 > preview.log 2>&1 &
+          npx --yes wait-on@8 -t 30000 http://localhost:4173/
+      - run: node tests/e2e/now-playing.mjs
+
+  android:
+    name: Android (unit tests, debug APK, test-APK compile, APK inspection)
+    runs-on: ubuntu-latest
+    needs: web
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -60,11 +89,23 @@ jobs:
       - name: Compile instrumentation tests (no emulator on the runner)
         working-directory: android
         run: ./gradlew assembleDebugAndroidTest
-      - name: Check manifest policy (no INTERNET, backup off)
+      - name: Inspect the built APK (package, version, permissions, backup)
         run: |
-          set -e
-          M=android/app/build/intermediates/merged_manifests/debug/processDebugManifest/AndroidManifest.xml
-          test -f "$M" || M=$(find android/app/build -name AndroidManifest.xml -path '*merged_manifests/debug*' | head -1)
-          echo "Using $M"
-          ! grep -q 'android.permission.INTERNET' "$M"
-          grep -q 'android:allowBackup="false"' "$M"
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          test -f "$APK"
+          AAPT2=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
+          echo "aapt2: $AAPT2"
+          BADGING=$("$AAPT2" dump badging "$APK")
+          echo "$BADGING" | grep -E "^(package|uses-permission|sdkVersion|targetSdkVersion)" || true
+          VERSION=$(node -p "require('./package.json').version")
+          echo "$BADGING" | grep -q "^package: name='com.personal.cinematicmusic'"
+          echo "$BADGING" | grep -q "versionName='${VERSION}'"
+          # Only the app-private permission that AndroidX Core adds is acceptable.
+          UNEXPECTED=$(echo "$BADGING" | grep "^uses-permission" | grep -v "DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" || true)
+          if [ -n "$UNEXPECTED" ]; then echo "Unexpected permissions:"; echo "$UNEXPECTED"; exit 1; fi
+          TREE=$("$AAPT2" dump xmltree --file AndroidManifest.xml "$APK")
+          echo "$TREE" | grep -E "allowBackup|dataExtractionRules|fullBackupContent" || true
+          echo "$TREE" | grep -qE "allowBackup[^=]*=(false|\(type 0x12\)0x0)"
+          echo "$TREE" | grep -q "dataExtractionRules"
+          ! echo "$TREE" | grep -q "FileProvider"
