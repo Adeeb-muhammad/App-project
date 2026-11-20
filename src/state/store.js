@@ -21,7 +21,9 @@ export function getState() {
 }
 
 function emit() {
-  for (const listener of listeners) {
+  // Dispatch over a snapshot so a listener that subscribes (or unsubscribes)
+  // during dispatch neither receives the in-flight event nor skips a peer.
+  for (const listener of [...listeners]) {
     try {
       listener(state);
     } catch (error) {

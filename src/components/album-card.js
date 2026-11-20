@@ -1,4 +1,5 @@
 import { escapeHtml } from '../utils/dom.js';
+import { glowStyle } from '../utils/safe.js';
 import { href } from '../utils/navigation.js';
 import { artwork } from './artwork.js';
 
@@ -7,8 +8,7 @@ import { artwork } from './artwork.js';
  * behind the artwork instead of a hard border.
  */
 export function albumCard(album, { eager = false } = {}) {
-  const palette = Array.isArray(album?.palette) ? album.palette : [];
-  const style = `--glow-a:${escapeHtml(palette[0] ?? '#A78BFA')};--glow-b:${escapeHtml(palette[1] ?? '#7C6BFF')}`;
+  const style = glowStyle(album?.palette);
   const title = escapeHtml(album?.title ?? 'Untitled album');
   const artist = escapeHtml(album?.artist ?? 'Unknown artist');
 

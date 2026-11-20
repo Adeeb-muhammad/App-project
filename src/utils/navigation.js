@@ -14,6 +14,19 @@ function normaliseHash(hash) {
   return path.replace(/\/+$/, '') || '/';
 }
 
+/**
+ * Decodes one route parameter. Malformed escapes (e.g. `%E0%A4%A`) make
+ * decodeURIComponent throw; treat those as an invalid route instead of
+ * crashing the renderer.
+ */
+function decodeParam(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}
+
 export function parseRoute(hash = window.location.hash) {
   const path = normaliseHash(hash);
   const segments = path.split('/').filter(Boolean);
@@ -26,14 +39,15 @@ export function parseRoute(hash = window.location.hash) {
       const tab = LIBRARY_TABS.includes(second) ? second : 'songs';
       return { name: 'library', tab, path: `/library/${tab}`, segments };
     }
-    case 'playlists':
-      return second
-        ? { name: 'playlist', id: decodeURIComponent(second), path, segments }
-        : { name: 'playlists', path, segments };
-    case 'albums':
-      return second
-        ? { name: 'album', id: decodeURIComponent(second), path, segments }
-        : { name: 'notFound', path, segments };
+    case 'playlists': {
+      if (!second) return { name: 'playlists', path, segments };
+      const id = decodeParam(second);
+      return id === null ? { name: 'notFound', path, segments } : { name: 'playlist', id, path, segments };
+    }
+    case 'albums': {
+      const id = second ? decodeParam(second) : null;
+      return id === null ? { name: 'notFound', path, segments } : { name: 'album', id, path, segments };
+    }
     case 'now-playing':
       return { name: 'player', path, segments };
     case 'settings':

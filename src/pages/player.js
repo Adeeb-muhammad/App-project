@@ -1,4 +1,5 @@
 import { escapeHtml } from '../utils/dom.js';
+import { artStyle } from '../utils/safe.js';
 import { formatTime, pluralise } from '../utils/format.js';
 import { findAlbum } from '../data/library.js';
 import { getPlayerState, seekRatio, subscribe as subscribePlayer } from '../state/player.js';
@@ -76,8 +77,7 @@ function emptyPlayer(state) {
 function playerView(state, player) {
   const { track, isPlaying, position, duration } = player;
   const album = findAlbum(state.library, track.albumId);
-  const palette = Array.isArray(track.palette) ? track.palette : [];
-  const style = `--art-1:${escapeHtml(palette[0] ?? '#A78BFA')};--art-2:${escapeHtml(palette[1] ?? '#7C6BFF')};--art-3:${escapeHtml(palette[2] ?? '#11131A')}`;
+  const style = artStyle(track.palette);
   const percent = progressPercent(player);
 
   return `<section class="now-playing${isPlaying ? ' is-playing' : ''}" style="${style}" aria-labelledby="player-title">

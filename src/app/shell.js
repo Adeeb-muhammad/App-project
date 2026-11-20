@@ -89,8 +89,16 @@ export function mountShell(root) {
     if (typeof cleanup === 'function') cleanup();
     cleanup = null;
 
-    main.innerHTML = page.render(state, route);
-    cleanup = page.mount?.(main, { state, route }) ?? null;
+    // A render/mount failure must never leave a blank screen or break later
+    // navigation: show a recoverable error state instead.
+    try {
+      main.innerHTML = page.render(state, route);
+      cleanup = page.mount?.(main, { state, route }) ?? null;
+    } catch (error) {
+      console.error('[shell] failed to render route', route.path, error);
+      main.innerHTML = `<div class="screen"><h1 class="screen-head__title" tabindex="-1">Something went wrong</h1><p class="screen-head__sub">This screen could not be displayed.</p><a class="button button--ghost" href="#/">Back home</a></div>`;
+      cleanup = null;
+    }
 
     setActiveNavigation(route.name);
     const heading = main.querySelector('h1');

@@ -56,10 +56,28 @@ npx cap open android          # open in Android Studio (requires the native tool
 npm run android:debug         # build + sync + ./gradlew assembleDebug
 ```
 
-Environment note: the machine that produced this commit had **no JDK and no Android SDK**,
-so the APK could not be compiled. `android/` is a real generated Capacitor project with the
-correct package id and SDK settings; see [docs/TESTING.md](docs/TESTING.md) for exactly what
-was and was not verified.
+Environment note: the machines used so far had **no JDK and no Android SDK**, so no APK has
+been built locally. A `Build` GitHub Actions workflow (web build + Android debug build) is written
+but **not yet active**: it sits at `docs/ci/build.yml` because the token used to push could not
+create files under `.github/workflows/`. Move it there (instructions in the file) to enable CI;
+until it has run, no Android build has been verified by anyone. See [docs/TESTING.md](docs/TESTING.md) for exactly what was and was not verified.
+
+### Tests and CI
+
+```bash
+npm test         # unit tests (Node built-in runner, no extra dependencies)
+npm run verify   # tests + production build
+```
+
+Browser flow check for Now Playing: `tests/e2e/now-playing.mjs` (needs Playwright, see the
+header of that file). Once enabled, CI runs `npm ci`, `npm test`, `npm run build`, then on Android:
+`cap sync`, `testDebugUnitTest`, `assembleDebug` and `assembleDebugAndroidTest`.
+
+### Versioning, privacy and security
+
+The app version lives in `package.json` only; Android reads it from there (details in
+[docs/SECURITY.md](docs/SECURITY.md)). The app requests no permissions, disables cloud
+backup and device transfer, and has no network access by design.
 
 ### Renaming the app
 
@@ -87,12 +105,14 @@ src/
   state/player.js          Simulated transport state (no audio)
   data/demo-data.js        Fictional development-only library
   data/library.js          Library view model, empty by default
-  utils/                   navigation (hash router), demo-mode, dom, format
+  utils/                   navigation (hash router), demo-mode, dom, format, safe (data boundary)
   styles/                  global, layout, components, home, library, playlists, player, settings
 public/
   artwork/                 Eight original abstract SVG artworks
   fonts/                   Self-hosted OFL fonts (Instrument Serif, Manrope) + licences
-docs/                      Product spec, architecture, roadmap, tasks, testing
+tests/                     Unit tests (npm test) and e2e/ browser script
+docs/ci/build.yml          CI workflow (inactive until moved to .github/workflows/)
+docs/                      Product spec, architecture, roadmap, tasks, testing, security
 android/                   Generated Capacitor Android project
 ```
 
@@ -103,6 +123,7 @@ android/                   Generated Capacitor Android project
 - [docs/DEVELOPMENT_ROADMAP.md](docs/DEVELOPMENT_ROADMAP.md) — phased plan.
 - [docs/TASKS.md](docs/TASKS.md) — exact implementation status and remaining work.
 - [docs/TESTING.md](docs/TESTING.md) — commands run, actual results and gaps.
+- [docs/SECURITY.md](docs/SECURITY.md) — backup, permissions, FileProvider, signing, versioning.
 
 ## Design notes
 
@@ -120,6 +141,5 @@ android/                   Generated Capacitor Android project
 - No music import, database or persistence. The library is empty unless `?demo=1` is used.
 - Playlist creation/editing is not implemented.
 - No app icon or splash screen has been produced yet.
-- The Android APK has not been built in this environment (no JDK/SDK).
-- Browser verification of the Now Playing screen after the render-loop fix is still pending;
-  see docs/TESTING.md before starting the next task.
+- No APK has been built or run locally; Android compilation is not verified anywhere yet (CI is written but inactive). The instrumentation test has never been executed on a device or emulator.
+- Keyboard-only and screen-reader walkthroughs and desktop layout were not inspected.
