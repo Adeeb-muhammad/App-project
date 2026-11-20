@@ -1,14 +1,21 @@
 apply plugin: 'com.android.application'
 
+// Single source of truth for the app version is package.json (semantic MAJOR.MINOR.PATCH).
+// versionCode is a separate Android integer that must be increased for every release.
+def appVersionName = new groovy.json.JsonSlurper().parse(file('../../package.json')).version
+
 android {
     namespace = "com.personal.cinematicmusic"
     compileSdk = rootProject.ext.compileSdkVersion
+    buildFeatures {
+        buildConfig = true // BuildConfig.VERSION_NAME is used by VersionPolicyTest
+    }
     defaultConfig {
         applicationId "com.personal.cinematicmusic"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName appVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

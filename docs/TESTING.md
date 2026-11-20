@@ -3,6 +3,70 @@
 This file records what was actually run and observed. Anything not listed here was not
 tested.
 
+## Integration session results (branch `claude/final-hardening-integration`)
+
+Environment: same Linux workspace (Node v22.23.5, npm 10.9.9, Playwright 1.63 + Chromium
+1243, OpenJDK 21 *runtime* only). Google Maven, Maven Central, plugins.gradle.org,
+services.gradle.org and dl.google.com all returned no response (HTTP 000), so Gradle/AGP and
+the Android SDK cannot be obtained. **No Android build of any kind was possible.**
+
+| Command | Result |
+| --- | --- |
+| `rm -rf node_modules && npm ci` | exit 0, 0 vulnerabilities |
+| `npm run verify` (= `npm test` + `npm run build`) | 21 tests, 21 pass, 0 fail; Vite build OK |
+| `node tests/e2e/now-playing.mjs` against `vite preview` of the production build | 39/39 checks passed |
+| `actionlint docs/ci/build.yml` | exit 0 (and confirmed to report errors on a deliberately broken file) |
+| `xmllint --noout` on the manifest and `data_extraction_rules.xml` | well-formed |
+
+Negative checks (tests were shown to fail on bad input): `android-policy.test.js` fails
+when a `device_sharedpref` exclusion is removed; the emoji-initial test fails against the
+previous `artwork.js`.
+
+Not run: any Gradle task, APK build, merged-manifest/APK inspection, lint, instrumentation
+tests (never compiled or executed), device or emulator checks, and **GitHub Actions - the
+workflow is inactive and has never executed**, so there is no CI result.
+
+## Hardening session results (branch `claude/milestone-1-hardening`)
+
+Environment: Linux cloud workspace, Node v22.23.5, npm 10.9.9, Chromium 1243 via Playwright 1.63.
+JDK / Android SDK: **not available**; the Gradle distribution cannot be downloaded from here.
+
+| Command | Result |
+| --- | --- |
+| `npm ci` | exit 0, 0 vulnerabilities |
+| `npm test` | 16 tests, 16 pass, 0 fail (at that time) |
+| `npm run build` | exit 0, Vite build succeeds (JS about 52 kB, CSS about 31 kB) |
+| `node tests/e2e/now-playing.mjs` (against `vite preview` of the production build, 390x844) | **39/39 checks passed** |
+
+The store listener test was also run against the *original* `store.js` and failed
+("listener added during dispatch..."), confirming it detects the vulnerability.
+
+What the browser run covered (the 13-step sequence from the task): demo mode, album,
+play, pause, resume, next, previous, seek to 50 percent, open queue, select another queued
+track, close queue, close Now Playing, return via the mini-player. It asserted the displayed
+title, play/pause labels on both Now Playing and the mini-player, elapsed time and mini
+progress after seeking, queue highlighting, responsiveness after each phase, exactly one
+re-render per next / queue-select, one active simulated-clock interval after 15 open/close
+cycles (no accumulated subscriptions), Escape to close, four malformed/unknown routes
+(`#/albums/%E0%A4%A`, `#/playlists/%`, `#/nope`, unknown album id), browser back twice, the
+empty Now Playing state without demo mode, zero uncaught/console errors and zero non-local
+network requests.
+
+Limits of that run: artwork "updates" were checked only as the `src` being present (the
+first tracks share one album's artwork); listener counts were inferred from render and
+interval counts, not by inspecting module internals; Chromium only, no real Android WebView.
+
+**Not run / not verified:**
+
+- `./gradlew` anything (`assembleDebug`, `testDebugUnitTest`, `assembleDebugAndroidTest`).
+  The new Java tests and the Gradle version wiring have **not been compiled by us**.
+- `connectedDebugAndroidTest` on an emulator/device was never executed.
+- CI: the workflow is written (`docs/ci/build.yml`) but **inactive and never run** (push token
+  has no workflow permission). There is no CI result.
+- The merged-manifest check for INTERNET/backup exists only in that inactive workflow.
+
+## Milestone 1 session (historical)
+
 ## Environment
 
 | Item | Value |
@@ -103,9 +167,8 @@ Fix applied:
 2. Track-change re-rendering moved to `app/shell.js`, which re-renders the player route only
    when it is active; the player page only handles progress and play/pause state.
 
-The production build passed after the fix. **The corrected Now Playing flow was not
-re-tested in the browser before the session ended** — the cloud tab was still unresponsive
-and the workspace moved runners. This is the highest-priority follow-up.
+The production build passed after the fix. The flow was re-tested in the hardening session
+(see the top of this file).
 
 ## Not tested
 
@@ -114,7 +177,6 @@ and the workspace moved runners. This is the highest-priority follow-up.
 - Install or launch of an APK.
 - Desktop layout at ≥960px (CSS implemented, not visually reviewed).
 - Keyboard-only navigation, focus order and screen-reader output.
-- Queue open/select/close after the fix.
 - Search interactions beyond the earlier manual checks (pre-fix checks passed for filtering
   and the no-match state in an earlier partial run, but the final consolidated pass did not
   complete).

@@ -1,6 +1,6 @@
 # Tasks — Cinematic Music
 
-Last updated at the end of the Milestone 1 session (project version 0.1.0).
+Last updated at the end of the Milestone 1 hardening session (project version 0.1.0).
 
 ## Completed
 
@@ -69,28 +69,66 @@ Last updated at the end of the Milestone 1 session (project version 0.1.0).
       shell (only when the player route is active). Production build re-run successfully
       after the fix.
 
+## Hardening session (branch `claude/milestone-1-hardening`)
+
+- [x] Branch history (verified in the integration session): PR #1 *was* merged into `main`
+      (`007bc56`). PR #2 (hardening) was merged only into the old
+      `freebuff/7c4ab9b5b46fa71777e346ea` branch (`0bcf4db`), **not** into `main`, so `main`
+      lacked all hardening until the integration PR (`claude/final-hardening-integration`).
+- [x] Android test package mismatch fixed: tests now live in `com.personal.cinematicmusic`
+      and assert the real application id, backup flag, absence of INTERNET and version name
+      format (`AppPackageInstrumentedTest`); template unit test replaced by `VersionPolicyTest`.
+      **Never compiled or run by us; CI would compile them once enabled.**
+- [x] `allowBackup=false`, Android 12+ `data_extraction_rules.xml`, INTERNET removed,
+      FileProvider + `file_paths.xml` removed (see `SECURITY.md`).
+- [x] Signing material excluded in `.gitignore`.
+- [x] Single version source (`package.json` → Gradle `versionName` → Settings).
+- [x] `store.js` dispatches over a snapshot (same listener-mutation weakness as the player).
+- [x] Router no longer throws on malformed percent-encoding; shell has a render error
+      boundary.
+- [x] `src/utils/safe.js`: hex-only colours, local-only artwork sources; all palette/artwork
+      call sites migrated; library filters tolerate non-string metadata.
+- [x] 21 unit/policy tests (`npm test`) and a 39-check Playwright run of the full Now Playing flow
+      against a production build (see `TESTING.md`).
+- [ ] CI: workflow written (web, e2e, Android jobs), validated with actionlint, but **not
+      active and never run**. It is at `docs/ci/build.yml`; the push token has no workflow
+      permission. Move it to `.github/workflows/build.yml` and confirm the first run; expect
+      to iterate on the Android and e2e jobs.
+
+## Integration session (branch `claude/final-hardening-integration`)
+
+- [x] Integrated the hardening into the `main` lineage with a `--no-ff` merge (no history
+      rewritten, no force-push).
+- [x] Backup rules completed: explicit `path="."`, all nine domains incl. `device_*` in both
+      sections, redundant `fullBackupContent` removed; policy test added.
+- [x] Review fixes: dead code removed from `safe.js`; fallback artwork no longer splits
+      emoji; documented that `safeImageSrc` will need an explicit rule for
+      `Capacitor.convertFileSrc` URLs when local artwork is added.
+- [x] Corrected docs that overstated "no permissions" (source vs merged manifest).
+- [ ] Android build could not be attempted: Google Maven, Maven Central and
+      services.gradle.org are unreachable from the working environment.
+
 ## Not verified / incomplete
 
-- [ ] **Re-verify Now Playing in a browser after the loop fix.** The cloud browser tab became
-      unresponsive during the pre-fix test and the session moved runners before the post-fix
-      walkthrough could run. The fix is implemented and builds, but the full interaction flow
-      has not been replayed.
-- [ ] Android APK build and device run. This machine has no JDK and no Android SDK, so
-      `./gradlew assembleDebug` could not be attempted.
-- [ ] Desktop responsive layout not inspected visually (CSS is implemented; mobile layouts
-      were reviewed).
+- [ ] Android debug APK: **not built locally** (no JDK/SDK/Gradle download access). Only an
+      enabled CI run or a local build can show it; do not treat the APK as working until a CI run (or a local build) succeeds
+      and the APK is installed on a device.
+- [ ] Instrumentation tests never executed on an emulator/device (CI would only compile them).
+- [ ] Desktop responsive layout not inspected visually.
 - [ ] Keyboard-only walkthrough and screen-reader spot check not performed.
-- [ ] Queue interactions (open, select, close with Escape) not re-tested after the fix.
+- [ ] Release signing, app icon, splash screen.
+- [ ] `goBack()` uses `history.back()` when history exists, which can leave the app if it was
+      opened by deep link from another page; not changed.
+- [ ] Next/previous while paused starts playback (current simulation behaviour; decide
+      before wiring native playback).
 
 ## Remaining work (next sessions)
 
 ### Immediate
 
-- [ ] Run the post-fix browser pass: album → play → pause → next → queue → close, with
-      console error capture; record results in `TESTING.md`.
-- [ ] Build and install a debug APK on a machine with JDK 21 + SDK 36; verify safe areas.
+- [ ] Build and install a debug APK on a machine with JDK 21 + SDK 36; verify safe areas;
+      run `./gradlew connectedDebugAndroidTest`.
 - [ ] Add adaptive app icon and splash screen.
-- [ ] Confirm `npx cap sync` output after any asset changes.
 
 ### Phase 2 candidates
 
