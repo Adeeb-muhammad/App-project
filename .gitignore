@@ -28,3 +28,14 @@ android/local.properties
 android/app/src/main/assets/public/
 android/app/src/main/assets/capacitor.config.json
 android/app/src/main/assets/capacitor.plugins.json
+
+# Android release signing material (never commit)
+*.jks
+*.keystore
+keystore.properties
+*.p12
+*.pfx
+*.pem
+*.key
+signing.properties
+google-services.json

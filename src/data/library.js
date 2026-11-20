@@ -24,7 +24,7 @@ function emptyLibrary() {
 }
 
 function artistId(name) {
-  return name
+  return String(name ?? '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
@@ -119,7 +119,7 @@ export function filterSongs(songs, query) {
   if (!term) return songs;
   return songs.filter((song) =>
     [song.title, song.artist, song.albumTitle].some((value) =>
-      value.toLowerCase().includes(term),
+      String(value ?? '').toLowerCase().includes(term),
     ),
   );
 }
@@ -128,12 +128,12 @@ export function filterAlbums(albums, query) {
   const term = normalise(query);
   if (!term) return albums;
   return albums.filter((album) =>
-    [album.title, album.artist].some((value) => value.toLowerCase().includes(term)),
+    [album.title, album.artist].some((value) => String(value ?? '').toLowerCase().includes(term)),
   );
 }
 
 export function filterArtists(artists, query) {
   const term = normalise(query);
   if (!term) return artists;
-  return artists.filter((artist) => artist.name.toLowerCase().includes(term));
+  return artists.filter((artist) => String(artist.name ?? '').toLowerCase().includes(term));
 }

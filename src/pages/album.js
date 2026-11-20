@@ -1,4 +1,5 @@
 import { escapeHtml } from '../utils/dom.js';
+import { glowStyle } from '../utils/safe.js';
 import { href } from '../utils/navigation.js';
 import { formatRuntime, pluralise, totalDuration } from '../utils/format.js';
 import { findAlbum } from '../data/library.js';
@@ -27,13 +28,12 @@ export const albumPage = {
       </div>`;
     }
 
-    const palette = Array.isArray(album.palette) ? album.palette : [];
     const runtime = formatRuntime(totalDuration(album.tracks));
 
     return `<div class="screen screen--album">
       <a class="back-link" href="${href('/library/albums')}">${icon('arrowLeft', { size: 16 })} All albums</a>
 
-      <header class="album-hero" style="--glow-a:${escapeHtml(palette[0] ?? '#A78BFA')};--glow-b:${escapeHtml(palette[1] ?? '#7C6BFF')}">
+      <header class="album-hero" style="${glowStyle(album.palette)}">
         <div class="album-hero__art">
           ${artwork(album, { className: 'album-hero__image', eager: true, alt: `Artwork for ${album.title}` })}
         </div>
