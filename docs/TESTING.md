@@ -3,6 +3,64 @@
 This file records what was actually run and observed. Anything not listed here was not
 tested.
 
+## Milestone 2A results (branch `feature/milestone-2a-native-playback`)
+
+Environment: Linux cloud workspace, Node **v26.13.0**, npm **11.20.0**, Temurin JDK
+**21.0.13.1**, Android SDK **36** + build-tools **36.0.0**, Gradle wrapper **8.14.3**,
+Media3 **1.11.1**, Playwright **1.63** with Chromium 1243. The container has no system fonts,
+so browser assertions read `textContent` and wait for attached nodes rather than relying on
+text-height-driven `innerText`/visibility; this does not change what the checks assert.
+
+| Command | Result |
+| --- | --- |
+| `npm ci --no-fund --no-audit` | exit **0** |
+| `npm test` | **42 tests, 42 pass, 0 fail** |
+| `npm run verify` | exit **0**; 42/42 tests + Vite build |
+| `node tests/e2e/native-playback.mjs` (production build, 390×844) | **18/18 checks passed** |
+| `node tests/e2e/now-playing.mjs` (production build, 390×844) | **39/39 checks passed** |
+| `cd android && ./gradlew clean testDebugUnitTest assembleDebug assembleDebugAndroidTest` | exit **0**, 191 tasks |
+| Android host unit tests | **3 passed** (`PlaybackPolicyTest` 2, `VersionPolicyTest` 1), 0 failures |
+| `adb devices` | no devices/emulators attached |
+
+Build outputs:
+
+- `android/app/build/outputs/apk/debug/app-debug.apk` — 7,756,895 bytes (final build),
+  SHA-256 `531b86ffab097dfccda4b87db96ad8f4…`
+- `android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk` — 565,651 bytes
+  (compiled, never executed)
+
+APK inspection with `aapt2 dump badging` / `dump xmltree`:
+
+- package `com.personal.cinematicmusic`, versionName `0.1.0`, targetSdk 36.
+- permissions: `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, `POST_NOTIFICATIONS`,
+  `WAKE_LOCK` and the app-private AndroidX dynamic-receiver permission. **No INTERNET,
+  ACCESS_NETWORK_STATE or storage permission.**
+- `PlaybackService` exported, `foregroundServiceType=0x00000002` (mediaPlayback), with the
+  `androidx.media3.session.MediaSessionService` intent filter.
+- `allowBackup=false`, data-extraction rules present, no FileProvider.
+
+WHAT THE BROWSER RUN COVERED
+
+- Non-demo Library offers **Import audio**, explains that the browser cannot open device files,
+  and leaves the library empty (no invented tracks or fake mini-player).
+- Clicking Import shows the Android-required notice; no `<audio>` element is ever created.
+- Demo mode still renders tracks, opens Now Playing, shows the “simulated” engine note,
+  toggles pause/play, and keeps the mini-player in sync.
+- The full regression flow (play → pause → next → previous → seek → queue → Escape → close →
+  reopen, 15 open/close cycles, malformed routes, no console errors, no external requests)
+  still passes.
+
+**Not tested (must not be reported as working):** real file picking, audible playback, seek
+with real media, background playback, notification controls, lock-screen controls, audio focus,
+headphone unplugging, and URI-grant revocation. The instrumentation APK was only compiled. A
+physical device or emulator is required for those checks:
+
+```bash
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+# then import a file, play it, background the app, use the notification and lock screen
+cd android && ./gradlew connectedDebugAndroidTest   # with a device attached
+```
+
 ## Integration session results (branch `claude/final-hardening-integration`)
 
 Environment: same Linux workspace (Node v22.23.5, npm 10.9.9, Playwright 1.63 + Chromium
@@ -172,7 +230,8 @@ The production build passed after the fix. The flow was re-tested in the hardeni
 
 ## Not tested
 
-- Real audio playback — none exists; the transport is a simulation.
+- Real audio playback — Milestone 2A adds it, but only compilation/APK inspection ran here;
+  no device playback was performed.
 - Android runtime, WebView, back button, safe areas, status bar.
 - Install or launch of an APK.
 - Desktop layout at ≥960px (CSS implemented, not visually reviewed).

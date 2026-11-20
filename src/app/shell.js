@@ -5,7 +5,9 @@ import {
   parseRoute,
   subscribe as subscribeRoute,
 } from '../utils/navigation.js';
-import { getState, subscribe as subscribeStore } from '../state/store.js';
+import { getState, refreshLibrary, subscribe as subscribeStore } from '../state/store.js';
+import { addImportedTrack } from '../data/imported.js';
+import { pickAudioTrack } from '../native/audio-import.js';
 import {
   getPlayerState,
   next,
@@ -56,6 +58,8 @@ function shellMarkup({ demo }) {
       ${demo ? `<span class="dev-chip" role="status" title="Development preview: sample albums, no imported music"><span class="dev-chip__dot" aria-hidden="true"></span>Dev preview</span>` : ''}
     </header>
 
+    <p class="app-notice" data-role="notice" role="status" aria-live="polite" hidden></p>
+
     <main id="app-main" class="app-main" tabindex="-1"></main>
 
     <div class="mini-player-slot" data-role="mini-player-slot"></div>
@@ -69,8 +73,20 @@ export function mountShell(root) {
 
   const main = root.querySelector('#app-main');
   const miniSlot = root.querySelector('[data-role="mini-player-slot"]');
+  const notice = root.querySelector('[data-role="notice"]');
 
   let cleanup = null;
+  let noticeTimer = null;
+
+  function showNotice(message) {
+    if (!notice || !message) return;
+    notice.textContent = message;
+    notice.hidden = false;
+    if (noticeTimer) window.clearTimeout(noticeTimer);
+    noticeTimer = window.setTimeout(() => {
+      notice.hidden = true;
+    }, 7000);
+  }
 
   function renderMiniPlayer() {
     const playerState = getPlayerState();
@@ -124,7 +140,7 @@ export function mountShell(root) {
     renderRoute({ focus: false });
   });
 
-  subscribePlayer(({ type, state: playerState }) => {
+  subscribePlayer(({ type, state: playerState, message }) => {
     if (type === 'track') {
       renderMiniPlayer();
       // When the full-screen player is open it owns the current track's
@@ -134,6 +150,10 @@ export function mountShell(root) {
     }
     if (type === 'state') {
       renderMiniPlayer();
+      return;
+    }
+    if (type === 'notice') {
+      showNotice(message ?? 'Something went wrong.');
       return;
     }
     if (type === 'progress') {
@@ -163,6 +183,29 @@ export function mountShell(root) {
     }
     if (action === 'close-player') {
       goBack('/');
+      return;
+    }
+    if (action === 'import-audio') {
+      event.preventDefault();
+      if (element.dataset.busy === 'true') return;
+      element.dataset.busy = 'true';
+      element.setAttribute('aria-busy', 'true');
+      pickAudioTrack()
+        .then((result) => {
+          if (!result.ok) {
+            if (result.message) showNotice(result.message);
+            return;
+          }
+          const { track } = addImportedTrack(result.track);
+          if (!track) return;
+          refreshLibrary();
+          showNotice(`Added “${track.title}” to your library.`);
+          navigate('/library/songs');
+        })
+        .finally(() => {
+          delete element.dataset.busy;
+          element.removeAttribute('aria-busy');
+        });
       return;
     }
     if (action === 'play-track') {

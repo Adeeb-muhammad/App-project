@@ -1,16 +1,27 @@
 /**
- * Transport state for the prototype.
+ * Playback boundary.
  *
- * IMPORTANT: this module does NOT play audio. It is a UI simulation used by the
- * demo preview so the controls, progress bar and queue can be reviewed. On a
- * real device, playback will be provided by AndroidX Media3 / ExoPlayer through
- * a MediaSessionService exposed over a Capacitor plugin (see
- * docs/ARCHITECTURE.md). Screens only talk to this module's small API, so that
- * native source can replace the simulation without redesigning the UI.
+ * Three engines share one API:
+ *
+ * - `simulation` — the demo preview (`?demo=1`) and the default in Node tests.
+ *   It advances a clock; it never decodes audio and says so in the UI.
+ * - `native` — AndroidX Media3 through `CinematicAudioPlugin`. The
+ *   `MediaSessionService` owns playback, so the UI is a projection of native
+ *   state and keeps working when the WebView is backgrounded.
+ * - `unavailable` — a real browser without Capacitor. Selecting a track is
+ *   allowed, but pressing play explains that Android is required instead of
+ *   pretending audio is playing.
+ *
+ * Screens only use this module, so the engine can change without touching a
+ * page. The listener-dispatch snapshot rule from Milestone 1 still applies.
  */
 
 const TICK_MS = 250;
 const listeners = new Set();
+
+let engine = 'simulation';
+let bridge = null;
+let bridgeUnsubscribe = null;
 
 let state = {
   track: null,
@@ -31,11 +42,12 @@ function snapshot() {
     isPlaying: state.isPlaying,
     position: state.position,
     duration: state.duration,
+    engine,
   };
 }
 
-function emit(type) {
-  const detail = { type, state: snapshot() };
+function emit(type, extra = {}) {
+  const detail = { type, state: snapshot(), ...extra };
   // Iterate over a snapshot: a listener may re-render the active screen and
   // subscribe a fresh listener while this event is still being dispatched.
   for (const listener of [...listeners]) {
@@ -45,6 +57,11 @@ function emit(type) {
       console.error('[player] listener failed', error);
     }
   }
+}
+
+function notify(message) {
+  if (!message) return;
+  emit('notice', { message });
 }
 
 function stopTimer() {
@@ -108,6 +125,87 @@ function step(direction, { automatic = false } = {}) {
   setIndex(nextIndex, { autoplay: true });
 }
 
+/** Fire-and-forget native call; failures surface as a human notice. */
+function invoke(method, args = []) {
+  if (!bridge || typeof bridge[method] !== 'function') return Promise.resolve();
+  try {
+    return Promise.resolve(bridge[method](...args)).catch((error) => {
+      console.error(`[player] native ${method} failed`, error);
+      notify('The playback service could not be reached. Try again.');
+    });
+  } catch (error) {
+    console.error(`[player] native ${method} failed`, error);
+    notify('The playback service could not be reached. Try again.');
+    return Promise.resolve();
+  }
+}
+
+function handleNativeState(native) {
+  if (engine !== 'native' || !native || typeof native !== 'object') return;
+  // The service can outlive the WebView. Without a JS queue there is nothing to
+  // map a media id onto, so ignore stale state instead of inventing a track.
+  if (state.queue.length === 0) return;
+
+  const previousId = state.track?.id ?? null;
+  const previousPlaying = state.isPlaying;
+
+  let index = state.queue.findIndex((track) => track.id === native.trackId);
+  if (index === -1 && Number.isInteger(native.index) && native.index >= 0 && native.index < state.queue.length) {
+    index = native.index;
+  }
+  if (index !== -1) {
+    state.index = index;
+    state.track = state.queue[index];
+  }
+
+  const positionMs = Number(native.positionMs);
+  if (Number.isFinite(positionMs) && positionMs >= 0) state.position = positionMs / 1000;
+
+  const durationMs = Number(native.durationMs);
+  if (Number.isFinite(durationMs) && durationMs > 0) state.duration = durationMs / 1000;
+  else if (state.track) state.duration = state.track.duration ?? state.duration;
+
+  state.isPlaying = Boolean(native.isPlaying);
+
+  const trackChanged = (state.track?.id ?? null) !== previousId;
+  const playingChanged = state.isPlaying !== previousPlaying;
+  emit(trackChanged || playingChanged ? 'track' : 'progress');
+}
+
+/**
+ * Chooses the engine. Called once from `main.js` before the shell mounts.
+ * Tests call it directly with a fake bridge.
+ */
+export function configurePlayback({ mode = 'simulation', bridge: nextBridge = null } = {}) {
+  stopTimer();
+  if (typeof bridgeUnsubscribe === 'function') bridgeUnsubscribe();
+  bridgeUnsubscribe = null;
+
+  // Native mode without a bridge would silently pretend to play; degrade to
+  // the honest browser state instead.
+  engine = mode === 'native' && !nextBridge ? 'unavailable' : mode;
+  bridge = engine === 'native' ? nextBridge : null;
+
+  if (engine === 'native' && bridge) {
+    bridgeUnsubscribe = bridge.subscribe(handleNativeState);
+    // The service may already be playing (e.g. WebView recreated while audio
+    // continued), so pull the authoritative state once instead of assuming.
+    Promise.resolve(bridge.getState?.())
+      .then(handleNativeState)
+      .catch(() => {});
+  }
+
+  emit('state');
+}
+
+/** Re-reads native state after the app returns to the foreground. */
+export function syncFromNative() {
+  if (engine !== 'native' || !bridge) return;
+  Promise.resolve(bridge.getState?.())
+    .then(handleNativeState)
+    .catch((error) => console.warn('[player] could not read native state', error));
+}
+
 export function subscribe(listener) {
   listeners.add(listener);
   return () => listeners.delete(listener);
@@ -117,26 +215,66 @@ export function getPlayerState() {
   return snapshot();
 }
 
-/** Starts a queue at the given track. `tracks` are library track objects. */
-export function playTrack(tracks, trackId) {
-  const list = Array.isArray(tracks) ? tracks.filter(Boolean) : [];
-  const index = list.findIndex((track) => track.id === trackId);
-  if (index === -1) return;
-  state.queue = list;
-  setIndex(index, { autoplay: true });
+export function getPlaybackEngine() {
+  return engine;
 }
 
-/** Selects a track without starting the simulated clock (album "open"). */
-export function selectTrack(tracks, trackId) {
+/** Starts a queue at the given track. `tracks` are library track objects. */
+export function playTrack(tracks, trackId, { autoplay = true } = {}) {
   const list = Array.isArray(tracks) ? tracks.filter(Boolean) : [];
   const index = list.findIndex((track) => track.id === trackId);
-  if (index === -1) return;
+  if (index === -1) return false;
+
   state.queue = list;
-  setIndex(index, { autoplay: false });
+  state.index = index;
+  state.track = list[index];
+  state.position = 0;
+  state.duration = list[index].duration ?? 0;
+
+  if (engine === 'unavailable') {
+    state.isPlaying = false;
+    stopTimer();
+    emit('track');
+    notify('Playback requires the Android app. This browser preview cannot play local audio.');
+    return false;
+  }
+
+  if (engine === 'native') {
+    // Optimistic, corrected by the first MediaController event.
+    state.isPlaying = autoplay;
+    stopTimer();
+    emit('track');
+    invoke('setQueue', [list, index, autoplay]);
+    return true;
+  }
+
+  state.isPlaying = autoplay;
+  if (autoplay) startTimer();
+  else stopTimer();
+  emit('track');
+  return true;
+}
+
+/** Selects a track without starting playback (used when opening an album). */
+export function selectTrack(tracks, trackId) {
+  return playTrack(tracks, trackId, { autoplay: false });
 }
 
 export function toggle() {
   if (!state.track) return;
+
+  if (engine === 'unavailable') {
+    notify('Playback requires the Android app. This browser preview cannot play local audio.');
+    return;
+  }
+
+  if (engine === 'native') {
+    state.isPlaying = !state.isPlaying;
+    emit('state');
+    invoke(state.isPlaying ? 'play' : 'pause');
+    return;
+  }
+
   if (state.position >= state.duration) state.position = 0;
   state.isPlaying = !state.isPlaying;
   if (state.isPlaying) startTimer();
@@ -145,10 +283,18 @@ export function toggle() {
 }
 
 export function next() {
+  if (engine === 'native') {
+    invoke('next');
+    return;
+  }
   step(1);
 }
 
 export function previous() {
+  if (engine === 'native') {
+    invoke('previous');
+    return;
+  }
   step(-1);
 }
 
@@ -156,11 +302,20 @@ export function seekRatio(ratio) {
   if (!state.track) return;
   const clamped = Math.min(Math.max(Number(ratio) || 0, 0), 1);
   state.position = clamped * state.duration;
+  if (engine === 'native') invoke('seek', [state.position * 1000]);
   emit('progress');
 }
 
 export function clear() {
   stopTimer();
-  state = { track: null, queue: [], index: -1, isPlaying: false, position: 0, duration: 0 };
+  if (engine === 'native') invoke('stop');
+  state = {
+    track: null,
+    queue: [],
+    index: -1,
+    isPlaying: false,
+    position: 0,
+    duration: 0,
+  };
   emit('track');
 }

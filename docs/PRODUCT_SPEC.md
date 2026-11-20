@@ -35,7 +35,10 @@ Everything the app does must eventually work with no network connection.
 5. **Built to grow.** The foundation separates presentation, state and data so native
    playback and local import can be added without rewriting screens.
 
-## 4. Screens (Milestone 1)
+## 4. Screens
+
+Milestone 1 defined the layouts. Milestone 2A adds a real import control and native playback;
+playlists remain read-only demo content.
 
 ### Home (`#/`)
 
@@ -43,10 +46,10 @@ Everything the app does must eventually work with no network connection.
 - Featured album hero with large artwork, metadata and preview actions.
 - Recently played, Recently added and Favourite albums rails.
 - Playlist shortcuts.
-- Persistent mini-player when a preview track is selected.
+- Persistent mini-player when a track is selected.
 - Bottom navigation (left rail on wide screens).
-- Empty state when the library has no content: explains that local import is coming and
-  lists what the foundation already includes.
+- Empty state when the library has no content: offers **Import audio** in the Android app and
+  links to the library.
 
 ### Library (`#/library/songs|albums|artists`)
 
@@ -54,6 +57,8 @@ Everything the app does must eventually work with no network connection.
 - Songs: artwork row, title, artist · album, duration, play target.
 - Albums: responsive grid of album cards.
 - Artists: derived artist rows with album and track counts.
+- **Import audio** bar: Android’s document picker, one file at a time, with a clear note that
+  the browser preview cannot open device files.
 - Search field filtering the active section, with a live result announcement and a
   "No matches" state.
 - Per-section empty states when the library is empty.
@@ -61,7 +66,7 @@ Everything the app does must eventually work with no network connection.
 ### Playlists (`#/playlists`)
 
 - Playlist cards with generated gradient covers, name, track count and description.
-- Designed empty state explaining that playlist creation arrives with local import.
+- Designed empty state; playlist creation/editing is not implemented yet.
 - Playlist detail (`#/playlists/:id`): collection hero, play action, track list.
 
 ### Album detail (`#/albums/:id`)
@@ -75,13 +80,15 @@ Everything the app does must eventually work with no network connection.
 - Large artwork, album name and year, track title, artist.
 - Scrubber with elapsed and total time.
 - Previous, play/pause and next controls; queue button opens a bottom-sheet queue.
-- Clear note that transport is a UI simulation and no audio engine is connected.
+- Engine note that reflects reality: Media3/background playback on Android, “simulated” in
+  demo mode, or “native playback requires the Android app” in a browser.
 - Empty state when nothing is playing, with different copy for demo and real mode.
 
 ### Settings (`#/settings`)
 
-- Library: music folders (Planned), imported track count (real value, currently 0).
-- Playback: audio engine (Planned, Media3), playback settings (Planned).
+- Library: music folders (Planned), imported track count (real value).
+- Playback: audio engine (Media3 on Android, Simulation in demo, Unavailable in a browser),
+  playback settings (Planned).
 - About: application name, version, platform (via Capacitor), library mode.
 - Developer section visible only in development builds, with a demo-preview toggle.
 - Demo banner when the preview library is active.

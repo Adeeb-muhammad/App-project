@@ -7,6 +7,7 @@ import { artwork } from '../components/artwork.js';
 import { emptyState } from '../components/empty-state.js';
 import { icon } from '../components/icon.js';
 import { sectionHeader } from '../components/section-header.js';
+import { isAndroidNative } from '../native/native-audio.js';
 
 function greeting(date = new Date()) {
   const hour = date.getHours();
@@ -35,7 +36,7 @@ function featuredHero(album) {
       <h2 class="hero__title">${escapeHtml(album.title)}</h2>
       <p class="hero__meta">${escapeHtml(album.artist)} · ${escapeHtml(album.year)} · ${pluralise(album.tracks.length, 'track')}</p>
       <div class="hero__actions">
-        <button class="button button--primary" type="button" data-action="play-album" data-album-id="${escapeHtml(album.id)}" aria-label="Play ${escapeHtml(album.title)} (UI preview)">
+        <button class="button button--primary" type="button" data-action="play-album" data-album-id="${escapeHtml(album.id)}" aria-label="Play ${escapeHtml(album.title)}">
           ${icon('play', { size: 16 })} Play album
         </button>
         <a class="button button--ghost" href="${href(`/albums/${encodeURIComponent(album.id)}`)}">View album</a>
@@ -68,9 +69,11 @@ function playlistShortcuts(playlists) {
 }
 
 function emptyHome() {
-  const hint = import.meta.env.DEV
-    ? 'Tip: add ?demo=1 to the URL to preview the interface with sample albums.'
-    : '';
+  const hint = isAndroidNative()
+    ? 'Import an audio file from this device to start your collection. Nothing is copied or uploaded.'
+    : import.meta.env.DEV
+      ? 'Tip: add ?demo=1 to the URL to preview the interface with sample albums.'
+      : 'Native import and playback run in the Android app.';
 
   return `<div class="screen screen--home">
     <header class="screen-head">
@@ -86,9 +89,11 @@ function emptyHome() {
           iconName: 'music',
           title: 'Your library is quiet',
           description:
-            'Nothing has been imported yet. Local music import arrives in the next milestone — this space is already built for it.',
+            'Import an audio file from this device to begin. It stays on your phone and plays through AndroidX Media3, even when the app is in the background.',
           hint,
-          action: `<a class="button button--ghost" href="${href('/library')}">Open the library</a>`,
+          action: `${isAndroidNative()
+            ? `<button class="button button--primary" type="button" data-action="import-audio">Import audio</button>`
+            : ''}<a class="button button--ghost" href="${href('/library')}">Open the library</a>`,
         })}
       </div>
     </section>
@@ -98,11 +103,11 @@ function emptyHome() {
       <ul class="next-steps__list">
         <li class="next-steps__item">
           <span class="next-steps__icon" aria-hidden="true">${icon('disc', { size: 18 })}</span>
-          <span><strong>Native playback, later</strong><span>AndroidX Media3 and a MediaSessionService will own audio in a dedicated milestone.</span></span>
+          <span><strong>Native playback</strong><span>AndroidX Media3 and a MediaSessionService own audio, including background and lock-screen controls.</span></span>
         </li>
         <li class="next-steps__item">
           <span class="next-steps__icon" aria-hidden="true">${icon('folder', { size: 18 })}</span>
-          <span><strong>Local import, next</strong><span>Songs stay on the device; nothing is uploaded and no account is needed.</span></span>
+          <span><strong>Local import</strong><span>Android’s document picker grants access to only the files you choose. Nothing is uploaded.</span></span>
         </li>
         <li class="next-steps__item">
           <span class="next-steps__icon" aria-hidden="true">${icon('sparkles', { size: 18 })}</span>

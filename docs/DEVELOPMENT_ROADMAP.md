@@ -34,6 +34,11 @@ system bars; icon and splash look correct.
 
 ## Phase 2 — Local import and persistence
 
+**Milestone 2A delivered a subset:** single-file Storage Access Framework import, persistable
+URI grants, metadata read with `MediaMetadataRetriever`, `localStorage` metadata (not SQLite)
+and a live library view model. Folder/multi-file import, embedded artwork, scanning and database
+migrations remain.
+
 - Storage Access Framework import flow (folder or multi-file picker).
 - Metadata parsing (title, artist, album, track number, duration) and embedded artwork.
 - Local database (SQLite through a Capacitor-compatible plugin) and schema migrations.
@@ -44,6 +49,11 @@ system bars; icon and splash look correct.
 demo data remains separate.
 
 ## Phase 3 — Native playback (Media3)
+
+**Milestone 2A delivered the core:** Kotlin Capacitor plugin, Media3 ExoPlayer in a
+`MediaSessionService`, notification/lock-screen session, audio focus, seek, next/previous and
+background playback. Queue editing, repeat/shuffle, gapless behaviour and a device verification
+pass remain.
 
 - Kotlin Capacitor plugin wrapping ExoPlayer.
 - `MediaSessionService` with notification, lock screen, audio focus and headset controls.

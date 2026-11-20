@@ -1,4 +1,5 @@
 import { buildDemoLibrary, buildEmptyLibrary } from '../data/library.js';
+import { buildImportedLibrary, loadImportedTracks } from '../data/imported.js';
 
 /**
  * Minimal observable store. Pages receive an immutable snapshot and the shell
@@ -55,8 +56,15 @@ export function initStore({ demo }) {
   state = {
     ...state,
     demo,
-    library: demo ? buildDemoLibrary() : buildEmptyLibrary(),
+    library: demo ? buildDemoLibrary() : buildImportedLibrary(loadImportedTracks()),
   };
+  emit();
+}
+
+/** Rebuilds the real library after an import. Demo data stays isolated. */
+export function refreshLibrary() {
+  if (state.demo) return;
+  state = { ...state, library: buildImportedLibrary(loadImportedTracks()) };
   emit();
 }
 

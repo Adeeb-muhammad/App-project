@@ -22,7 +22,7 @@ export function miniPlayer(playerState) {
         <span class="mini-player__artist">${artist}</span>
       </span>
     </a>
-    <button class="mini-player__toggle" type="button" data-action="toggle-play" aria-label="${isPlaying ? 'Pause preview' : 'Play preview'}">
+    <button class="mini-player__toggle" type="button" data-action="toggle-play" aria-label="${isPlaying ? 'Pause' : 'Play'}">
       ${icon(isPlaying ? 'pause' : 'play', { size: 18 })}
     </button>
     <span class="mini-player__progress" aria-hidden="true">
