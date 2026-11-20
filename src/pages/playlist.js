@@ -1,4 +1,5 @@
 import { escapeHtml } from '../utils/dom.js';
+import { glowStyle } from '../utils/safe.js';
 import { href } from '../utils/navigation.js';
 import { formatRuntime, pluralise } from '../utils/format.js';
 import { findPlaylist } from '../data/library.js';
@@ -26,12 +27,11 @@ export const playlistPage = {
       </div>`;
     }
 
-    const palette = Array.isArray(playlist.palette) ? playlist.palette : [];
 
     return `<div class="screen screen--playlist">
       <a class="back-link" href="${href('/playlists')}">${icon('arrowLeft', { size: 16 })} All playlists</a>
 
-      <header class="collection-hero" style="--glow-a:${escapeHtml(palette[0] ?? '#A78BFA')};--glow-b:${escapeHtml(palette[1] ?? '#7C6BFF')}">
+      <header class="collection-hero" style="${glowStyle(playlist.palette)}">
         <span class="collection-hero__cover" aria-hidden="true">
           <span class="collection-hero__ring"></span>
           ${icon('playlists', { size: 30 })}

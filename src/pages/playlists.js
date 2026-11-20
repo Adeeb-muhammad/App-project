@@ -1,12 +1,12 @@
 import { escapeHtml } from '../utils/dom.js';
+import { glowStyle } from '../utils/safe.js';
 import { href } from '../utils/navigation.js';
 import { formatRuntime, pluralise } from '../utils/format.js';
 import { emptyState } from '../components/empty-state.js';
 import { icon } from '../components/icon.js';
 
 function playlistCard(playlist) {
-  const palette = Array.isArray(playlist.palette) ? playlist.palette : [];
-  const style = `--glow-a:${escapeHtml(palette[0] ?? '#A78BFA')};--glow-b:${escapeHtml(palette[1] ?? '#7C6BFF')}`;
+  const style = glowStyle(playlist.palette);
 
   return `<li class="playlist-card-item">
     <a class="playlist-card" href="${href(`/playlists/${encodeURIComponent(playlist.id)}`)}" style="${style}">

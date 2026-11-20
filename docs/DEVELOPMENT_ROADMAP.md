@@ -17,8 +17,8 @@ Phases are sequential. Each phase ends with a review before the next begins.
 **Exit criteria:** production build passes; navigation works; demo mode is opt-in;
 Capacitor project is generated and synced.
 
-**Carry-over:** re-verify Now Playing after the render-loop fix (see docs/TASKS.md), build the
-APK on a machine with JDK 21 + Android SDK 36.
+**Carry-over:** build the APK on a machine with JDK 21 + Android SDK 36 (CI attempts it; see
+docs/TASKS.md). Now Playing was re-verified in a browser during the hardening session.
 
 ## Phase 1 — Hardening and identity
 
@@ -27,7 +27,7 @@ APK on a machine with JDK 21 + Android SDK 36.
   of the app).
 - Confirm performance on a low-end Android device.
 - Verify edge-to-edge insets on a real device and gesture navigation.
-- Add `android:allowBackup` / security review decisions.
+- ~~Add `android:allowBackup` / security review decisions.~~ Done in the hardening session; see SECURITY.md.
 
 **Exit:** installed debug APK reviewed on a physical device; no layout collisions with
 system bars; icon and splash look correct.
@@ -71,7 +71,7 @@ media buttons.
 ## Phase 6 — Personal release
 
 - Release keystore and signed AAB/APK (kept out of the repository).
-- Versioning policy and changelog.
+- Changelog (versioning policy is in SECURITY.md).
 - Backup/export of playlists and settings.
 - Install on the owner's device; no store listing required.
 

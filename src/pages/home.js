@@ -1,4 +1,5 @@
 import { escapeHtml } from '../utils/dom.js';
+import { glowStyle } from '../utils/safe.js';
 import { href } from '../utils/navigation.js';
 import { pluralise } from '../utils/format.js';
 import { albumCard } from '../components/album-card.js';
@@ -27,8 +28,7 @@ function albumRail(title, albums, seeAllPath = null) {
 
 function featuredHero(album) {
   if (!album) return '';
-  const palette = Array.isArray(album.palette) ? album.palette : [];
-  return `<section class="hero" style="--glow-a:${escapeHtml(palette[0] ?? '#A78BFA')};--glow-b:${escapeHtml(palette[1] ?? '#7C6BFF')}">
+  return `<section class="hero" style="${glowStyle(album.palette)}">
     <div class="hero__art">${artwork(album, { className: 'hero__image', eager: true, alt: `Artwork for ${album.title}` })}</div>
     <div class="hero__body">
       <p class="eyebrow">Featured album</p>
@@ -51,9 +51,8 @@ function playlistShortcuts(playlists) {
     <ul class="shortcut-list">
       ${playlists
         .map((playlist) => {
-          const palette = Array.isArray(playlist.palette) ? playlist.palette : [];
           return `<li>
-            <a class="shortcut" href="${href(`/playlists/${encodeURIComponent(playlist.id)}`)}" style="--glow-a:${escapeHtml(palette[0] ?? '#A78BFA')};--glow-b:${escapeHtml(palette[1] ?? '#7C6BFF')}">
+            <a class="shortcut" href="${href(`/playlists/${encodeURIComponent(playlist.id)}`)}" style="${glowStyle(playlist.palette)}">
               <span class="shortcut__mark" aria-hidden="true">${icon('playlists', { size: 18 })}</span>
               <span class="shortcut__text">
                 <span class="shortcut__name">${escapeHtml(playlist.name)}</span>
