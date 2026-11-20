@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" role="img" aria-label="Abstract artwork: Lowlight">
+  <defs>
+    <radialGradient id="bg" cx="24%" cy="78%" r="90%">
+      <stop offset="0" stop-color="#0b2a24" />
+      <stop offset="0.5" stop-color="#071a18" />
+      <stop offset="1" stop-color="#040a0b" />
+    </radialGradient>
+    <linearGradient id="glass" x1="120" y1="120" x2="680" y2="700" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#34d399" stop-opacity="0.8" />
+      <stop offset="0.55" stop-color="#0ea5e9" stop-opacity="0.35" />
+      <stop offset="1" stop-color="#34d399" stop-opacity="0" />
+    </linearGradient>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="46" />
+    </filter>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" stitchTiles="stitch" />
+      <feColorMatrix type="saturate" values="0" />
+      <feComponentTransfer><feFuncA type="linear" slope="0.5" /></feComponentTransfer>
+    </filter>
+  </defs>
+
+  <rect width="800" height="800" fill="url(#bg)" />
+
+  <g filter="url(#soft)">
+    <ellipse cx="200" cy="620" rx="270" ry="200" fill="#34d399" opacity="0.4" />
+    <ellipse cx="620" cy="240" rx="220" ry="170" fill="#0ea5e9" opacity="0.18" />
+  </g>
+
+  <path d="M120 720 640 120" stroke="url(#glass)" stroke-width="1.6" fill="none" opacity="0.8" />
+  <path d="M188 760 708 160" stroke="url(#glass)" stroke-width="0.9" fill="none" opacity="0.4" />
+  <path d="M60 668 580 68" stroke="url(#glass)" stroke-width="0.8" fill="none" opacity="0.3" />
+
+  <circle cx="612" cy="188" r="3" fill="#d1fae5" opacity="0.9" />
+  <circle cx="656" cy="238" r="1.6" fill="#d1fae5" opacity="0.5" />
+  <circle cx="146" cy="562" r="2" fill="#a7f3d0" opacity="0.5" />
+
+  <rect width="800" height="800" filter="url(#grain)" opacity="0.12" style="mix-blend-mode: overlay" />
+</svg>

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" role="img" aria-label="Abstract artwork: Glass Tide">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#0a1b2b" />
+      <stop offset="0.6" stop-color="#071420" />
+      <stop offset="1" stop-color="#040810" />
+    </linearGradient>
+    <linearGradient id="wave" x1="80" y1="300" x2="720" y2="620" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22d3ee" stop-opacity="0.9" />
+      <stop offset="0.5" stop-color="#3b82f6" stop-opacity="0.55" />
+      <stop offset="1" stop-color="#22d3ee" stop-opacity="0.05" />
+    </linearGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="42" />
+    </filter>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" stitchTiles="stitch" />
+      <feColorMatrix type="saturate" values="0" />
+      <feComponentTransfer><feFuncA type="linear" slope="0.5" /></feComponentTransfer>
+    </filter>
+  </defs>
+
+  <rect width="800" height="800" fill="url(#bg)" />
+
+  <g filter="url(#soft)">
+    <ellipse cx="580" cy="210" rx="220" ry="150" fill="#22d3ee" opacity="0.35" />
+    <ellipse cx="230" cy="650" rx="260" ry="180" fill="#3b82f6" opacity="0.26" />
+  </g>
+
+  <g fill="none" stroke="url(#wave)">
+    <path d="M-40 330C120 250 260 430 420 350S700 250 840 330" stroke-width="2.2" />
+    <path d="M-40 390C120 310 260 490 420 410S700 310 840 390" stroke-width="1.4" opacity="0.7" />
+    <path d="M-40 450C120 370 260 550 420 470S700 370 840 450" stroke-width="1" opacity="0.45" />
+    <path d="M-40 510C120 430 260 610 420 530S700 430 840 510" stroke-width="0.8" opacity="0.28" />
+  </g>
+
+  <circle cx="596" cy="178" r="3.5" fill="#cffafe" opacity="0.9" />
+  <circle cx="632" cy="206" r="1.6" fill="#cffafe" opacity="0.55" />
+  <circle cx="180" cy="250" r="2" fill="#93c5fd" opacity="0.45" />
+
+  <rect width="800" height="800" filter="url(#grain)" opacity="0.11" style="mix-blend-mode: overlay" />
+</svg>

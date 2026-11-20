@@ -1,0 +1,78 @@
+.library-results {
+  padding-top: 2px;
+}
+
+.album-hero {
+  position: relative;
+  display: grid;
+  gap: 20px;
+  margin: 4px 0 26px;
+  padding: 18px;
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: linear-gradient(160deg, rgba(25, 27, 37, 0.88), rgba(17, 19, 26, 0.6));
+  overflow: hidden;
+}
+
+.album-hero::before {
+  content: '';
+  position: absolute;
+  top: -140px;
+  right: -80px;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--glow-a, #a78bfa), transparent 68%);
+  opacity: 0.35;
+  filter: blur(20px);
+  pointer-events: none;
+}
+
+.album-hero__art {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-lift);
+}
+
+.album-hero__image {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.album-hero__body {
+  position: relative;
+}
+
+.album-hero__title {
+  margin: 6px 0 6px;
+  font-size: clamp(32px, 9vw, 46px);
+  line-height: 1;
+}
+
+.album-hero__artist {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.album-hero__meta {
+  margin: 4px 0 16px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.song-row__number {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 720px) {
+  .album-hero {
+    grid-template-columns: 250px minmax(0, 1fr);
+    align-items: end;
+    gap: 26px;
+    padding: 22px;
+  }
+}
