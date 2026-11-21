@@ -168,16 +168,16 @@ ${state.demo ? '' : `        <div class="track-rating" role="group" aria-label="
   </section>`;
 }
 
-function updateProgress(root, player) {
+function updateProgress(root, player, { preserveScrubber = false } = {}) {
   const percent = progressPercent(player);
   const scrubber = root.querySelector('[data-role="scrubber"]');
-  if (scrubber) {
+  if (scrubber && !preserveScrubber) {
     scrubber.value = String(Math.round(percent * 10));
     scrubber.style.setProperty('--progress', `${percent.toFixed(2)}%`);
     scrubber.setAttribute('aria-valuetext', `${formatTime(player.position)} of ${formatTime(player.duration)}`);
   }
   const elapsed = root.querySelector('[data-role="elapsed"]');
-  if (elapsed) elapsed.textContent = formatTime(player.position);
+  if (elapsed && !preserveScrubber) elapsed.textContent = formatTime(player.position);
   const duration = root.querySelector('[data-role="duration"]');
   if (duration) duration.textContent = formatTime(player.duration);
 }
@@ -251,22 +251,46 @@ export const playerPage = {
       }
     }
 
-    root.querySelector('[data-role="scrubber"]')?.addEventListener(
-      'input',
-      (event) => {
-        seekRatio(Number(event.target.value) / 1000);
-      },
-      { signal },
-    );
+    const scrubber = root.querySelector('[data-role="scrubber"]');
+    let isScrubbing = false;
+
+    const previewScrub = () => {
+      if (!scrubber) return;
+      const ratio = Number(scrubber.value) / 1000;
+      const duration = getPlayerState().duration;
+      const position = ratio * duration;
+      scrubber.style.setProperty('--progress', `${(ratio * 100).toFixed(2)}%`);
+      scrubber.setAttribute('aria-valuetext', `${formatTime(position)} of ${formatTime(duration)}`);
+      const elapsed = root.querySelector('[data-role="elapsed"]');
+      if (elapsed) elapsed.textContent = formatTime(position);
+    };
+
+    const commitScrub = () => {
+      if (!scrubber || !isScrubbing) return;
+      const ratio = Number(scrubber.value) / 1000;
+      isScrubbing = false;
+      seekRatio(ratio);
+    };
+
+    scrubber?.addEventListener('pointerdown', () => { isScrubbing = true; }, { signal });
+    scrubber?.addEventListener('input', () => {
+      isScrubbing = true;
+      previewScrub();
+    }, { signal });
+    // Commit once when the native range interaction ends; don't send a Media3
+    // seek for every movement event or let service ticks fight the user's drag.
+    scrubber?.addEventListener('change', commitScrub, { signal });
+    scrubber?.addEventListener('pointercancel', commitScrub, { signal });
+    scrubber?.addEventListener('blur', commitScrub, { signal });
 
     const unsubscribe = subscribePlayer(({ type, state: playerState }) => {
       if (type === 'progress') {
-        updateProgress(root, playerState);
+        updateProgress(root, playerState, { preserveScrubber: isScrubbing });
         return;
       }
       if (type === 'state') {
         updateTransport(root, playerState);
-        updateProgress(root, playerState);
+        updateProgress(root, playerState, { preserveScrubber: isScrubbing });
       }
       // Track changes are handled by the shell, which re-renders this screen
       // with the new artwork, title and palette.
