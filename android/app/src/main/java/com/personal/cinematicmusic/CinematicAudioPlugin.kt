@@ -9,11 +9,12 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.activity.result.ActivityResult
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -24,6 +25,10 @@ import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.ActivityCallback
 import com.getcapacitor.annotation.CapacitorPlugin
+import com.getcapacitor.annotation.Permission
+import com.getcapacitor.annotation.PermissionCallback
+import com.google.common.util.concurrent.ListenableFuture
+import java.util.concurrent.Executors
 
 /**
  * JS ↔ Kotlin bridge for local playback.
@@ -31,12 +36,36 @@ import com.getcapacitor.annotation.CapacitorPlugin
  * File access uses ACTION_OPEN_DOCUMENT and takes a persistable read grant, so
  * no storage permission is requested and the app can only open the exact files
  * the user picked.
+ *
+ * The plugin owns exactly one [MediaController] connection. Every call waits for
+ * (or reuses) that same connection instead of opening a new one, so overlapping
+ * JS calls cannot create duplicate controllers or talk to a released player.
+ * Native playback failures are forwarded to JS as `playbackError` events.
  */
-@CapacitorPlugin(name = "CinematicAudio")
+@CapacitorPlugin(
+    name = "CinematicAudio",
+    permissions = [
+        Permission(
+            strings = [Manifest.permission.POST_NOTIFICATIONS],
+            alias = CinematicAudioPlugin.NOTIFICATION_ALIAS,
+        ),
+    ],
+)
 class CinematicAudioPlugin : Plugin() {
 
     private var controller: MediaController? = null
+
+    /**
+     * The single in-flight connection. Memoising it is what makes overlapping
+     * calls (tap a song, then immediately pause) share one controller.
+     */
+    private var pendingController: ListenableFuture<MediaController>? = null
+
+    private var destroyed = false
+    private var notificationPermissionRequested = false
+
     private val handler = Handler(Looper.getMainLooper())
+    private val metadataExecutor = Executors.newSingleThreadExecutor()
 
     private val playerListener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
@@ -45,6 +74,25 @@ class CinematicAudioPlugin : Plugin() {
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            emitPlaybackState(controller)
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            // Without this the WebView kept showing "playing" after ExoPlayer had
+            // already stopped, which is the freeze users see on the device.
+            Log.e(
+                PlaybackErrors.TAG,
+                "playback error ${error.errorCodeName} (${error.errorCode})",
+                error.cause,
+            )
+            updateTicker(false)
+            val payload = JSObject().apply {
+                put("code", error.errorCode)
+                put("codeName", PlaybackErrors.codeName(error.errorCode))
+                put("message", PlaybackErrors.userMessage(error.errorCode))
+                put("trackId", controller?.currentMediaItem?.mediaId)
+            }
+            notifyListeners("playbackError", payload)
             emitPlaybackState(controller)
         }
     }
@@ -96,17 +144,36 @@ class CinematicAudioPlugin : Plugin() {
             return
         }
 
-        val audio = AudioMetadataReader.read(context, uri)
-        val payload = JSObject().apply {
-            put("uri", audio.uri)
-            put("fileName", audio.fileName)
-            put("title", audio.title)
-            put("artist", audio.artist)
-            put("album", audio.album)
-            put("durationMs", audio.durationMs)
-            put("mimeType", audio.mimeType)
+        // A readable tag block does not prove the file can be read later, so the
+        // descriptor is opened once before the track is offered to the library.
+        if (!canRead(uri)) {
+            call.reject("Android could not open that file. Try another audio file.")
+            return
         }
-        call.resolve(payload)
+
+        val appContext = context.applicationContext
+        // MediaMetadataRetriever reads the whole tag block. Doing that on the
+        // main thread is what makes imports of large files hang the WebView.
+        metadataExecutor.execute {
+            val audio = try {
+                AudioMetadataReader.read(appContext, uri)
+            } catch (error: Exception) {
+                Log.w(PlaybackErrors.TAG, "metadata read failed", error)
+                handler.post { call.reject("That file could not be read as audio.") }
+                return@execute
+            }
+            if (destroyed) return@execute
+            val payload = JSObject().apply {
+                put("uri", audio.uri)
+                put("fileName", audio.fileName)
+                put("title", audio.title)
+                put("artist", audio.artist)
+                put("album", audio.album)
+                put("durationMs", audio.durationMs)
+                put("mimeType", audio.mimeType)
+            }
+            handler.post { if (!destroyed) call.resolve(payload) }
+        }
     }
 
     // -------------------------------------------------------------- playback
@@ -155,7 +222,6 @@ class CinematicAudioPlugin : Plugin() {
             )
             mediaController.prepare()
             if (autoplay) mediaController.play() else mediaController.pause()
-            requestNotificationPermission()
             emitPlaybackState(mediaController)
             call.resolve()
         }
@@ -168,7 +234,6 @@ class CinematicAudioPlugin : Plugin() {
                 mediaController.seekTo(0L)
             }
             mediaController.play()
-            requestNotificationPermission()
             call.resolve()
         }
     }
@@ -229,32 +294,77 @@ class CinematicAudioPlugin : Plugin() {
     @PluginMethod
     fun getState(call: PluginCall) {
         val mediaController = controller
-        if (mediaController == null) {
+        if (mediaController?.isConnected == true) {
+            call.resolve(statePayload(mediaController))
+            return
+        }
+        if (mediaController == null && pendingController == null) {
+            // Nothing is connected and nothing is connecting: report "no
+            // playback" instead of waking the service.
             call.resolve(emptyState())
             return
         }
-        call.resolve(statePayload(mediaController))
+        withController(call) { connected ->
+            call.resolve(statePayload(connected))
+        }
     }
 
-    // --------------------------------------------------------------- helpers
+    // ------------------------------------------------------------ connection
 
+    /**
+     * Runs [block] with the one connected controller, connecting first if needed.
+     * Concurrent callers share the same connection future, so only one
+     * MediaController is ever created.
+     */
     private fun withController(call: PluginCall, block: (MediaController) -> Unit) {
-        controller?.let {
-            block(it)
+        controller?.let { existing ->
+            if (existing.isConnected) {
+                block(existing)
+                return
+            }
+            // The service went away: drop the dead connection and reconnect
+            // instead of sending commands into a released controller.
+            Log.w(PlaybackErrors.TAG, "controller disconnected, reconnecting")
+            existing.removeListener(playerListener)
+            existing.release()
+            controller = null
+        }
+
+        if (destroyed) {
+            call.reject(UNAVAILABLE_MESSAGE)
             return
         }
 
-        val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
-        val future = MediaController.Builder(context, token).buildAsync()
+        val future = pendingController ?: run {
+            val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
+            MediaController.Builder(context, token)
+                .buildAsync()
+                .also { pendingController = it }
+        }
+
         future.addListener(
             {
+                if (destroyed) {
+                    call.reject(UNAVAILABLE_MESSAGE)
+                    return@addListener
+                }
                 try {
                     val mediaController = future.get()
-                    controller = mediaController
-                    mediaController.addListener(playerListener)
-                    block(mediaController)
+                    if (pendingController === future) pendingController = null
+                    val current = controller
+                    if (current == null) {
+                        controller = mediaController
+                        mediaController.addListener(playerListener)
+                    } else if (current !== mediaController) {
+                        // A second connection raced the first one; keep the
+                        // player that commands are already going to.
+                        mediaController.release()
+                    }
+                    block(controller ?: mediaController)
                 } catch (error: Exception) {
-                    call.reject("Playback service is unavailable", error)
+                    if (pendingController === future) pendingController = null
+                    Log.e(PlaybackErrors.TAG, "could not connect to the playback service", error)
+                    call.reject(UNAVAILABLE_MESSAGE, error)
                 }
             },
             ContextCompat.getMainExecutor(context),
@@ -267,6 +377,7 @@ class CinematicAudioPlugin : Plugin() {
     }
 
     private fun emitPlaybackState(player: Player?) {
+        if (destroyed) return
         val current = player ?: controller ?: return
         notifyListeners("playbackState", statePayload(current))
     }
@@ -274,14 +385,18 @@ class CinematicAudioPlugin : Plugin() {
     private fun statePayload(player: Player): JSObject {
         val item = player.currentMediaItem
         val duration = player.duration
+        val error = player.playerError
         return JSObject().apply {
             put("trackId", item?.mediaId)
             put("index", player.currentMediaItemIndex)
             put("isPlaying", player.isPlaying)
+            put("playWhenReady", player.playWhenReady)
+            put("playbackState", playbackStateName(player.playbackState))
             put("positionMs", player.currentPosition.coerceAtLeast(0L))
             put("durationMs", if (duration > 0) duration else 0L)
             put("buffering", player.playbackState == Player.STATE_BUFFERING)
             put("ended", player.playbackState == Player.STATE_ENDED)
+            put("errorCode", error?.let { PlaybackErrors.codeName(it.errorCode) })
         }
     }
 
@@ -289,39 +404,106 @@ class CinematicAudioPlugin : Plugin() {
         put("trackId", null)
         put("index", -1)
         put("isPlaying", false)
+        put("playWhenReady", false)
+        put("playbackState", "idle")
         put("positionMs", 0L)
         put("durationMs", 0L)
         put("buffering", false)
         put("ended", false)
+        put("errorCode", null)
     }
 
-    private fun requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        val host = bridge?.activity ?: return
-        if (
-            ContextCompat.checkSelfPermission(host, Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
-        ) {
+    private fun playbackStateName(state: Int): String = when (state) {
+        Player.STATE_IDLE -> "idle"
+        Player.STATE_BUFFERING -> "buffering"
+        Player.STATE_READY -> "ready"
+        Player.STATE_ENDED -> "ended"
+        else -> "unknown"
+    }
+
+    // ---------------------------------------------------------- notifications
+
+    /**
+     * Android 13+ hides the media notification (and with it the lock-screen and
+     * notification controls) until POST_NOTIFICATIONS is granted. JS asks for it
+     * once, on its own call, so a prompt or a denial can never fail playback or
+     * resolve the playback call twice.
+     */
+    @PluginMethod
+    fun requestNotificationPermission(call: PluginCall) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            call.resolve(permissionPayload(true))
             return
         }
-        ActivityCompat.requestPermissions(
-            host,
-            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-            NOTIFICATION_REQUEST_CODE,
-        )
+        if (notificationPermissionGranted()) {
+            call.resolve(permissionPayload(true))
+            return
+        }
+        if (notificationPermissionRequested || bridge?.activity == null) {
+            call.resolve(permissionPayload(false))
+            return
+        }
+        notificationPermissionRequested = true
+        try {
+            requestPermissionForAlias(NOTIFICATION_ALIAS, call, "notificationPermissionResult")
+        } catch (error: Exception) {
+            notificationPermissionRequested = false
+            Log.w(PlaybackErrors.TAG, "could not request notification permission", error)
+            call.resolve(permissionPayload(false))
+        }
+    }
+
+    @PermissionCallback
+    private fun notificationPermissionResult(call: PluginCall) {
+        notificationPermissionRequested = false
+        val granted = notificationPermissionGranted()
+        if (!granted) {
+            Log.w(PlaybackErrors.TAG, "notification permission denied; media controls stay hidden")
+            notifyListeners(
+                "playbackWarning",
+                JSObject().put(
+                    "message",
+                    "Notifications are off for Cinematic, so playback continues without media " +
+                        "controls in the notification shade or on the lock screen.",
+                ),
+            )
+        }
+        call.resolve(permissionPayload(granted))
+    }
+
+    private fun permissionPayload(granted: Boolean): JSObject =
+        JSObject().put("granted", granted)
+
+    private fun notificationPermissionGranted(): Boolean =
+        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+
+    // --------------------------------------------------------------- helpers
+
+    private fun canRead(uri: Uri): Boolean = try {
+        context.contentResolver.openInputStream(uri)?.use { it.read() } != null
+    } catch (error: Exception) {
+        Log.w(PlaybackErrors.TAG, "content URI is not readable after the picker", error)
+        false
     }
 
     override fun handleOnDestroy() {
+        destroyed = true
         handler.removeCallbacks(ticker)
+        pendingController?.cancel(true)
+        pendingController = null
         controller?.removeListener(playerListener)
         controller?.release()
         controller = null
+        metadataExecutor.shutdownNow()
         super.handleOnDestroy()
     }
 
-    private companion object {
-        const val POSITION_TICK_MS = 500L
-        const val PREVIOUS_RESTART_MS = 3_000L
-        const val NOTIFICATION_REQUEST_CODE = 4101
+    companion object {
+        const val NOTIFICATION_ALIAS = "notifications"
+
+        private const val POSITION_TICK_MS = 500L
+        private const val PREVIOUS_RESTART_MS = 3_000L
+        private const val UNAVAILABLE_MESSAGE = "Playback service is unavailable"
     }
 }

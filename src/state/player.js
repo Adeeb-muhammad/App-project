@@ -22,6 +22,8 @@ const listeners = new Set();
 let engine = 'simulation';
 let bridge = null;
 let bridgeUnsubscribe = null;
+let bridgeEventsUnsubscribe = null;
+let notificationPermissionAsked = false;
 
 let state = {
   track: null,
@@ -125,19 +127,53 @@ function step(direction, { automatic = false } = {}) {
   setIndex(nextIndex, { autoplay: true });
 }
 
-/** Fire-and-forget native call; failures surface as a human notice. */
+/**
+ * Native call that resolves to `true` when the service accepted it. Failures
+ * surface as a notice and as `false`, so callers can undo optimistic state
+ * instead of leaving the UI claiming to play.
+ */
 function invoke(method, args = []) {
-  if (!bridge || typeof bridge[method] !== 'function') return Promise.resolve();
+  if (!bridge || typeof bridge[method] !== 'function') return Promise.resolve(false);
   try {
-    return Promise.resolve(bridge[method](...args)).catch((error) => {
-      console.error(`[player] native ${method} failed`, error);
-      notify('The playback service could not be reached. Try again.');
-    });
+    return Promise.resolve(bridge[method](...args)).then(
+      () => true,
+      (error) => {
+        console.error(`[player] native ${method} failed`, error);
+        notify('The playback service could not be reached. Try again.');
+        return false;
+      },
+    );
   } catch (error) {
     console.error(`[player] native ${method} failed`, error);
     notify('The playback service could not be reached. Try again.');
-    return Promise.resolve();
+    return Promise.resolve(false);
   }
+}
+
+/**
+ * Android 13+ hides the media notification and lock-screen controls until the
+ * user allows notifications. Ask once, on first native playback, and never let
+ * the answer affect audio.
+ */
+function askForNotificationPermission() {
+  if (notificationPermissionAsked) return;
+  if (!bridge || typeof bridge.requestNotificationPermission !== 'function') return;
+  notificationPermissionAsked = true;
+  Promise.resolve(bridge.requestNotificationPermission()).catch(() => {});
+}
+
+/** Errors and warnings pushed by the native service. */
+function handleNativeEvent(event) {
+  if (engine !== 'native' || !event) return;
+  if (event.type === 'error') {
+    // ExoPlayer is the source of truth: it stopped, so the UI must stop too.
+    if (state.track) state.isPlaying = false;
+    stopTimer();
+    emit('state');
+    notify(event.message || 'Playback stopped unexpectedly. Try the track again.');
+    return;
+  }
+  if (event.type === 'warning' && event.message) notify(event.message);
 }
 
 function handleNativeState(native) {
@@ -180,6 +216,8 @@ export function configurePlayback({ mode = 'simulation', bridge: nextBridge = nu
   stopTimer();
   if (typeof bridgeUnsubscribe === 'function') bridgeUnsubscribe();
   bridgeUnsubscribe = null;
+  if (typeof bridgeEventsUnsubscribe === 'function') bridgeEventsUnsubscribe();
+  bridgeEventsUnsubscribe = null;
 
   // Native mode without a bridge would silently pretend to play; degrade to
   // the honest browser state instead.
@@ -188,6 +226,7 @@ export function configurePlayback({ mode = 'simulation', bridge: nextBridge = nu
 
   if (engine === 'native' && bridge) {
     bridgeUnsubscribe = bridge.subscribe(handleNativeState);
+    bridgeEventsUnsubscribe = bridge.subscribeEvents?.(handleNativeEvent) ?? null;
     // The service may already be playing (e.g. WebView recreated while audio
     // continued), so pull the authoritative state once instead of assuming.
     Promise.resolve(bridge.getState?.())
@@ -240,11 +279,19 @@ export function playTrack(tracks, trackId, { autoplay = true } = {}) {
   }
 
   if (engine === 'native') {
-    // Optimistic, corrected by the first MediaController event.
+    // Optimistic, corrected by the first MediaController event. If the service
+    // rejects the queue the optimistic state is rolled back below.
+    const startedTrackId = list[index].id;
     state.isPlaying = autoplay;
     stopTimer();
     emit('track');
-    invoke('setQueue', [list, index, autoplay]);
+    if (autoplay) askForNotificationPermission();
+    invoke('setQueue', [list, index, autoplay]).then((accepted) => {
+      if (!accepted && state.track?.id === startedTrackId) {
+        state.isPlaying = false;
+        emit('state');
+      }
+    });
     return true;
   }
 
@@ -269,9 +316,15 @@ export function toggle() {
   }
 
   if (engine === 'native') {
-    state.isPlaying = !state.isPlaying;
+    const desired = !state.isPlaying;
+    state.isPlaying = desired;
     emit('state');
-    invoke(state.isPlaying ? 'play' : 'pause');
+    invoke(desired ? 'play' : 'pause').then((accepted) => {
+      if (!accepted) {
+        state.isPlaying = !desired;
+        emit('state');
+      }
+    });
     return;
   }
 

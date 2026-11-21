@@ -260,3 +260,45 @@ With JDK 21 and SDK 36 available:
 cd android && ./gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
+
+## Android playback reliability fix (`fix/android-playback-reliability`)
+
+Branch base: `main` after PR #4. The fix forwards ExoPlayer failures to the WebView, keeps a
+single `MediaController` connection, moves metadata extraction off the main thread, requests
+`POST_NOTIFICATIONS` through Capacitor on its own call, and stops the service on task removal
+only when playback is not ongoing.
+
+Verified in this environment (JDK 21, Android SDK 36, Node 26):
+
+```bash
+npm test                                                          # 52/52 pass
+npm run build                                                     # pass
+cd android && ./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest
+```
+
+- `testDebugUnitTest`: 7/7 pass (4 new `PlaybackErrorsTest` cases).
+- `assembleDebug` and `assembleDebugAndroidTest`: pass; both APKs generated.
+- New `PlaybackPipelineInstrumentedTest` **compiled but not executed**: this environment has
+  no emulator (no KVM access) and no attached phone.
+- No physical-device playback was performed here. Background playback, notification and
+  lock-screen controls still need the HONOR X9a run below.
+
+Capture a full log while testing on the phone and filter the app's tags:
+
+```bash
+adb logcat -v time > cinematic-music-full.txt      # full buffers, not only events/radio
+adb logcat -s CinematicAudio CinematicPlayback      # the same run, filtered, in a second shell
+adb shell run-as com.personal.cinematicmusic ls    # optional: confirm the app data dir exists
+```
+
+```bash
+adb devices
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb shell am start -n com.personal.cinematicmusic/.MainActivity
+```
+
+Scenarios: play a local file for 30 s, press Home, switch apps, lock the screen, open the
+notification shade, return to the app, then dismiss the task. `CinematicPlayback` logs
+`isPlaying`/`playbackState` transitions and `CinematicAudio` logs any `playbackError` with its
+error code name. Import cancellation, permission denial and every playback failure now surface
+in the UI instead of a silent stall.

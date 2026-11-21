@@ -78,6 +78,15 @@ export function createNativeBridge() {
       return CinematicAudio.getState();
     },
 
+    /** Android 13+ notification/lock-screen permission; never fatal. */
+    async requestNotificationPermission() {
+      try {
+        return await CinematicAudio.requestNotificationPermission();
+      } catch {
+        return { granted: false };
+      }
+    },
+
     subscribe(listener) {
       let active = true;
       const handle = CinematicAudio.addListener('playbackState', (event) => {
@@ -88,6 +97,33 @@ export function createNativeBridge() {
         Promise.resolve(handle)
           .then((registration) => registration.remove())
           .catch(() => {});
+      };
+    },
+
+    /**
+     * Failures and warnings from the native service. `playbackError` means
+     * ExoPlayer really stopped; `playbackWarning` is advisory (for example the
+     * media notification cannot be shown because notifications are disabled).
+     */
+    subscribeEvents(listener) {
+      let active = true;
+      const handles = [];
+      const register = (eventName, type) => {
+        handles.push(
+          CinematicAudio.addListener(eventName, (event) => {
+            if (active) listener({ ...event, type });
+          }),
+        );
+      };
+      register('playbackError', 'error');
+      register('playbackWarning', 'warning');
+      return () => {
+        active = false;
+        for (const handle of handles) {
+          Promise.resolve(handle)
+            .then((registration) => registration.remove())
+            .catch(() => {});
+        }
       };
     },
   };
