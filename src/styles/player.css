@@ -410,3 +410,46 @@
     display: flex;
   }
 }
+
+.track-rating {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.track-rating__label {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.track-rating__stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.track-rating__star {
+  width: 25px;
+  height: 28px;
+  color: rgba(244, 241, 248, 0.38);
+  font-size: 19px;
+  line-height: 1;
+  transition: color 0.15s, transform 0.15s;
+}
+
+.track-rating__star:hover {
+  color: #f6ce80;
+  transform: translateY(-1px);
+}
+
+.track-rating__star.is-selected {
+  color: #f6ce80;
+}
+
+@media (min-width: 960px) {
+  .track-rating {
+    justify-content: flex-start;
+  }
+}
