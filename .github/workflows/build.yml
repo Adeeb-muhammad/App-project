@@ -80,8 +80,6 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Apply pinned InterTune compatibility fixes
         run: python3 scripts/prepare-intertune.py
-      - name: Resolve prebuilt FFmpeg libraries for the Full variant
-        run: git clone --depth 1 --branch audio https://github.com/mikooomich/ffmpeg-android-maker-prebuilt.git android/ffMetadataEx/ffmpeg-android-maker
       - name: Host unit tests
         working-directory: android
         run: ./gradlew :app:testFullDebugUnitTest
