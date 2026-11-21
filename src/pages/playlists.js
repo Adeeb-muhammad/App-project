@@ -3,7 +3,7 @@ import { glowStyle } from '../utils/safe.js';
 import { href } from '../utils/navigation.js';
 import { formatRuntime, pluralise } from '../utils/format.js';
 import { refreshLibrary } from '../state/store.js';
-import { createPlaylist, deletePlaylist } from '../data/personal-library.js';
+import { createPlaylist } from '../data/personal-library.js';
 import { emptyState } from '../components/empty-state.js';
 import { icon } from '../components/icon.js';
 
@@ -39,15 +39,17 @@ export const playlistsPage = {
         <p class="screen-head__sub">Build your own collections and keep them on this device.</p>
       </header>
 
-      ${state.demo ? '<p class="playlist-readonly">Demo preview is read-only. Create playlists in your real library.</p>' : `<form class="playlist-create" data-role="create-playlist-form">`
-        <label class="sr-only" for="new-playlist-name">Playlist name</label>
-        <input id="new-playlist-name" name="name" class="search__input" maxlength="40" required
-          placeholder="Name your playlist" autocomplete="off" />
-        <label class="sr-only" for="new-playlist-description">Playlist description</label>
-        <input id="new-playlist-description" name="description" class="search__input"
-          maxlength="180" placeholder="Description (optional)" autocomplete="off" />
-        <button class="button button--primary button--small" type="submit">Create playlist</button>
-      </form>`}
+      ${state.demo
+        ? '<p class="playlist-readonly">Demo preview is read-only. Create playlists in your real library.</p>'
+        : `<form class="playlist-create" data-role="create-playlist-form">
+            <label class="sr-only" for="new-playlist-name">Playlist name</label>
+            <input id="new-playlist-name" name="name" class="search__input" maxlength="40" required
+              placeholder="Name your playlist" autocomplete="off" />
+            <label class="sr-only" for="new-playlist-description">Playlist description</label>
+            <input id="new-playlist-description" name="description" class="search__input"
+              maxlength="180" placeholder="Description (optional)" autocomplete="off" />
+            <button class="button button--primary button--small" type="submit">Create playlist</button>
+          </form>`}
 
       ${playlists.length
         ? `<ul class="playlist-list">${playlists.map((playlist) => playlistCard(playlist, !state.demo)).join('')}</ul>`
