@@ -381,6 +381,13 @@ function commitQueueEdit(queue, index) {
     ? 0
     : Math.min(state.position, state.duration || state.position);
 
+  // Media3's shuffled navigation order is independent of the visible queue
+  // order. Turn shuffle off while editing so move/remove/clear match what plays.
+  if (state.shuffleEnabled) {
+    setShuffleEnabled(false);
+    notify('Shuffle turned off so your edited queue plays in the order shown.');
+  }
+
   const queueSnapshot = queue;
   if (engine === 'native') {
     invoke('setQueue', [queue, safeIndex, state.isPlaying, state.position * 1000]).then((accepted) => {
