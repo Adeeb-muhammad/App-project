@@ -361,6 +361,106 @@ export function previous() {
   step(-1);
 }
 
+/**
+ * Commit a queue edit while retaining the active track, playback state and
+ * position. The Android service remains the playback source of truth.
+ */
+function commitQueueEdit(queue, index) {
+  if (!Array.isArray(queue) || queue.length === 0) return false;
+  const safeIndex = Math.min(Math.max(Number(index) || 0, 0), queue.length - 1);
+  const previous = { ...state, queue: state.queue.slice() };
+  const previousTrackId = state.track?.id ?? null;
+  const track = queue[safeIndex];
+  const trackChanged = track?.id !== previousTrackId;
+
+  state.queue = queue;
+  state.index = safeIndex;
+  state.track = track;
+  const trackDuration = Number(track.duration);
+  state.duration = trackDuration > 0 ? trackDuration : trackChanged ? 0 : previous.duration;
+  state.position = trackChanged
+    ? 0
+    : Math.min(state.position, state.duration || state.position);
+
+  // Media3's shuffled navigation order is independent of the visible queue
+  // order. Turn shuffle off while editing so move/remove/clear match what plays.
+  if (state.shuffleEnabled) {
+    setShuffleEnabled(false);
+    notify('Shuffle turned off so your edited queue plays in the order shown.');
+  }
+
+  const queueSnapshot = queue;
+  if (engine === 'native') {
+    invoke('setQueue', [queue, safeIndex, state.isPlaying, state.position * 1000]).then((accepted) => {
+      if (!accepted && state.queue === queueSnapshot) {
+        state = previous;
+        emit(trackChanged ? 'track' : 'queue');
+      }
+    });
+  } else if (state.isPlaying) {
+    startTimer();
+  } else {
+    stopTimer();
+  }
+
+  emit(trackChanged ? 'track' : 'queue');
+  return true;
+}
+
+/** Insert a library track immediately after the current item. */
+export function enqueueNext(track) {
+  if (!track || typeof track.id !== 'string' || !track.id) return false;
+  if (!state.track || state.index < 0 || state.queue.length === 0) {
+    return playTrack([track], track.id);
+  }
+  if (track.id === state.track.id) return false;
+
+  const queue = state.queue.slice();
+  const existingIndex = queue.findIndex((item) => item.id === track.id);
+  if (existingIndex === state.index + 1) return false;
+  if (existingIndex >= 0) queue.splice(existingIndex, 1);
+
+  const currentIndex = queue.findIndex((item) => item.id === state.track.id);
+  if (currentIndex < 0) return false;
+  queue.splice(currentIndex + 1, 0, track);
+
+  // Media3's shuffle order can otherwise skip a deliberately pinned next
+  // track. Turn shuffle off for this explicit "Play next" action.
+  if (state.shuffleEnabled) {
+    setShuffleEnabled(false);
+    notify('Shuffle turned off so this track plays next.');
+  }
+  return commitQueueEdit(queue, currentIndex);
+}
+
+/** Remove an upcoming item; the active and already-played items are protected. */
+export function removeQueuedTrack(trackId) {
+  const index = state.queue.findIndex((item) => item.id === trackId);
+  if (index <= state.index || index < 0) return false;
+  const queue = state.queue.slice();
+  queue.splice(index, 1);
+  return commitQueueEdit(queue, state.index);
+}
+
+/** Move an upcoming item one place up (-1) or down (+1). */
+export function moveQueuedTrack(trackId, direction) {
+  const index = state.queue.findIndex((item) => item.id === trackId);
+  const delta = Number(direction);
+  const target = index + (delta < 0 ? -1 : delta > 0 ? 1 : 0);
+  if (index <= state.index || index < 0 || (delta !== -1 && delta !== 1)) return false;
+  if (target <= state.index || target >= state.queue.length) return false;
+
+  const queue = state.queue.slice();
+  [queue[index], queue[target]] = [queue[target], queue[index]];
+  return commitQueueEdit(queue, state.index);
+}
+
+/** Remove every upcoming item while leaving the current track playing. */
+export function clearUpcoming() {
+  if (state.index < 0 || state.queue.length <= state.index + 1) return false;
+  return commitQueueEdit(state.queue.slice(0, state.index + 1), state.index);
+}
+
 /** Enables/disables queue shuffling in the active playback engine. */
 export function setShuffleEnabled(enabled) {
   const nextValue = Boolean(enabled);

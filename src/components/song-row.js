@@ -32,6 +32,8 @@ ${showUtilities ? `<div class="song-row__utilities">
         data-action="toggle-favourite" data-track-id="${escapeHtml(track.id)}"
         aria-label="${favourite ? 'Remove from' : 'Add to'} Liked Songs" aria-pressed="${favourite}"
         title="${favourite ? 'Remove from Liked Songs' : 'Add to Liked Songs'}">${favourite ? '♥' : '♡'}</button>
+      <button class="song-row__utility" type="button" data-action="play-next"
+        data-track-id="${escapeHtml(track.id)}" aria-label="Play ${title} next" title="Play next">${icon('playNext', { size: 16 })}</button>
       <button class="song-row__utility" type="button" data-action="add-to-playlist"
         data-track-id="${escapeHtml(track.id)}" aria-label="Add ${title} to a playlist"
         title="Add to playlist">＋</button>

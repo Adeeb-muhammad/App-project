@@ -21,6 +21,10 @@ import {
   next,
   playTrack,
   previous,
+  enqueueNext,
+  removeQueuedTrack,
+  moveQueuedTrack,
+  clearUpcoming,
   setShuffleEnabled,
   cycleRepeatMode,
   subscribe as subscribePlayer,
@@ -205,6 +209,25 @@ export function mountShell(root) {
     }
     if (action === 'cycle-repeat') {
       cycleRepeatMode();
+      return;
+    }
+    if (action === 'play-next') {
+      const track = findTrack(getState().library, element.dataset.trackId);
+      if (!track) return;
+      if (enqueueNext(track)) showNotice(`Added “${track.title}” to play next.`);
+      else showNotice('That track is already next or is currently playing.');
+      return;
+    }
+    if (action === 'queue-move') {
+      moveQueuedTrack(element.dataset.trackId, Number(element.dataset.direction));
+      return;
+    }
+    if (action === 'remove-queue-track') {
+      if (removeQueuedTrack(element.dataset.trackId)) showNotice('Removed track from queue.');
+      return;
+    }
+    if (action === 'clear-upcoming') {
+      if (clearUpcoming()) showNotice('Cleared upcoming tracks. The current track will keep playing.');
       return;
     }
     if (action === 'next') {

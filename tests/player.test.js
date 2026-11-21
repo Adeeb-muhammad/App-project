@@ -64,6 +64,38 @@ test('shuffle and repeat preferences are exposed in player state', () => {
   player.clear();
 });
 
+test('queue edits add next, reorder, remove and clear upcoming without losing the current item', () => {
+  player.configurePlayback({ mode: 'simulation' });
+  player.playTrack(tracks, 't1');
+  player.seekRatio(0.42);
+  player.setShuffleEnabled(true);
+
+  assert.equal(player.enqueueNext(tracks[2]), true);
+  let state = player.getPlayerState();
+  assert.equal(state.shuffleEnabled, false);
+  assert.deepEqual(state.queue.map((track) => track.id), ['t1', 't3', 't2']);
+  assert.equal(state.index, 0);
+  assert.equal(state.track.id, 't1');
+  assert.equal(state.position, 42);
+
+  assert.equal(player.moveQueuedTrack('t2', -1), true);
+  state = player.getPlayerState();
+  assert.deepEqual(state.queue.map((track) => track.id), ['t1', 't2', 't3']);
+
+  assert.equal(player.removeQueuedTrack('t3'), true);
+  assert.deepEqual(player.getPlayerState().queue.map((track) => track.id), ['t1', 't2']);
+  assert.equal(player.removeQueuedTrack('t1'), false);
+  assert.equal(player.moveQueuedTrack('t1', 1), false);
+
+  assert.equal(player.clearUpcoming(), true);
+  state = player.getPlayerState();
+  assert.deepEqual(state.queue.map((track) => track.id), ['t1']);
+  assert.equal(state.track.id, 't1');
+  assert.equal(state.isPlaying, true);
+  assert.equal(player.clearUpcoming(), false);
+  player.clear();
+});
+
 test('seekRatio clamps and toggle pauses/resumes', () => {
   player.selectTrack(tracks, 't1');
   player.seekRatio(5);

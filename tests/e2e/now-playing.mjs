@@ -126,7 +126,16 @@ check('queue dialog open', await page.locator('dialog[data-role="queue"]').evalu
 const rowCount = await page.locator('.queue-row').count();
 check('queue lists tracks', rowCount > 1, `rows=${rowCount}`);
 check('queue marks current track', (await page.locator('.queue-row--current .queue-row__title').textContent()) === firstTitle);
-const target = page.locator('.queue-row:not(.queue-row--current)').nth(1);
+const firstUpcoming = page.locator('.queue-entry').nth(1);
+const firstUpcomingTitle = await firstUpcoming.locator('.queue-row__title').textContent();
+await firstUpcoming.locator('[data-action="queue-move"][data-direction="1"]').click();
+check('queue can move a track down', (await page.locator('.queue-entry').nth(2).locator('.queue-row__title').textContent()) === firstUpcomingTitle);
+await page.locator('.queue-entry').nth(2).locator('[data-action="queue-move"][data-direction="-1"]').click();
+check('queue can move a track back up', (await page.locator('.queue-entry').nth(1).locator('.queue-row__title').textContent()) === firstUpcomingTitle);
+const beforeRemove = await page.locator('.queue-row').count();
+await page.locator('.queue-entry').last().locator('[data-action="remove-queue-track"]').click();
+check('queue removes an upcoming track', await page.locator('.queue-row').count() === beforeRemove - 1);
+const target = page.locator('.queue-row:not(.queue-row--current)').first();
 const targetTitle = await target.locator('.queue-row__title').textContent();
 const rQ = await rendersDuring(() => target.click());
 check('selecting queued track changes title', (await title()) === targetTitle, targetTitle);
@@ -158,6 +167,19 @@ for (let i = 0; i < 15; i++) {
 const rCycle = await rendersDuring(() => page.locator('[data-action="next"]').click());
 check('after 15 open/close cycles next still renders once (no accumulated listeners)', rCycle === 1, `renders=${rCycle}`);
 check('only one simulated-clock interval active', (await page.evaluate(() => window.__intervals.size)) === 1, `intervals=${await page.evaluate(() => window.__intervals.size)}`);
+
+// Clear-upcoming is tested with a fresh four-track queue so the player has
+// multiple upcoming items even after the queue-editing cases above.
+await goto(`${BASE}?demo=1#/library/albums`);
+await page.locator('a.album-card').first().click();
+await page.locator('[data-action="play-album"]').click();
+await page.waitForSelector('.now-playing__title', { state: 'attached' });
+await page.locator('[data-action="open-queue"]').click();
+check('clear-upcoming control is available when tracks remain', await page.locator('[data-action="clear-upcoming"]').isVisible());
+await page.locator('[data-action="clear-upcoming"]').click();
+check('clear upcoming keeps the active track in the queue', await page.locator('.queue-row').count() === 1);
+check('clear upcoming becomes hidden when nothing remains', !(await page.locator('[data-action="clear-upcoming"]').isVisible()));
+await page.locator('[data-action="close-queue"]').click();
 
 // Escape, history, malformed URLs
 await page.keyboard.press('Escape');

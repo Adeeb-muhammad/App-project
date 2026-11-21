@@ -194,6 +194,7 @@ class CinematicAudioPlugin : Plugin() {
         }
         val startIndex = call.getInt("startIndex") ?: 0
         val autoplay = call.getBoolean("autoplay") ?: true
+        val requestedPositionMs = (call.getLong("positionMs") ?: 0L).coerceAtLeast(0L)
 
         val items = ArrayList<MediaItem>()
         for (index in 0 until tracks.length()) {
@@ -228,9 +229,9 @@ class CinematicAudioPlugin : Plugin() {
         withController(call, restoreQueue = false) { mediaController ->
             lastItems = items
             lastIndex = safeIndex
-            lastPositionMs = 0L
+            lastPositionMs = requestedPositionMs
             lastWasPlaying = autoplay
-            mediaController.setMediaItems(items, safeIndex, 0L)
+            mediaController.setMediaItems(items, safeIndex, requestedPositionMs)
             mediaController.shuffleModeEnabled = lastShuffleEnabled
             mediaController.repeatMode = lastRepeatMode
             mediaController.prepare()
