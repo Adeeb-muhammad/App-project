@@ -184,6 +184,12 @@ test('YouTube downloads become ordinary local tracks', () => {
   assert.match(downloadPlugin, /addOption\("--audio-format", "mp3"\)/);
   assert.match(downloadPlugin, /YoutubeDL\.getInstance\(\)\.init\(/);
   assert.match(downloadPlugin, /FFmpeg\.getInstance\(\)\.init\(/);
+  assert.match(downloadPlugin, /YoutubeDL\.UpdateChannel\.STABLE/);
+  assert.match(downloadPlugin, /YoutubeDL\.versionName\(appContext\)/);
+  const updaterCall = downloadPlugin.indexOf('YoutubeDL.getInstance().updateYoutubeDL(');
+  const executeCall = downloadPlugin.indexOf('YoutubeDL.getInstance().execute(');
+  assert.ok(updaterCall >= 0 && executeCall > updaterCall,
+    'refresh the official stable yt-dlp before executing a download');
   // The result must reach the player as a content:// URI, never a file path.
   assert.match(downloadPlugin, /FileProvider\.getUriForFile/);
   assert.match(downloadPlugin, /AudioMetadataReader\.read\(/);
