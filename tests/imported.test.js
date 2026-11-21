@@ -105,6 +105,8 @@ test('the imported library groups albums and artists for the existing screens', 
   assert.equal(night.artist, 'Nova');
   assert.equal(night.tracks[0].albumId, night.id);
   assert.equal(library.featured, library.albums[0]);
-  assert.deepEqual(library.playlists, []);
+  assert.equal(library.playlists.length, 1);
+  assert.equal(library.playlists[0].id, 'liked-songs');
+  assert.equal(library.playlists[0].trackCount, 0);
   assert.equal(buildImportedLibrary([]).hasContent, false);
 });
