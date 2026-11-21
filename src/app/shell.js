@@ -310,7 +310,7 @@ export function mountShell(root) {
       if (!trackId) return;
       const scope = element.closest('[data-queue]');
       const ids = scope
-        ? Array.from(scope.querySelectorAll('[data-track-id]')).map((node) => node.dataset.trackId)
+        ? Array.from(scope.querySelectorAll('[data-action="play-track"][data-track-id]')).map((node) => node.dataset.trackId)
         : [trackId];
       const tracks = ids
         .map((id) => findTrack(getState().library, id))
