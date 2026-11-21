@@ -78,6 +78,8 @@ pass. See [docs/TESTING.md](docs/TESTING.md) for exactly what was and was not ve
 - Create, rename and delete playlists; add tracks from Library and remove them from a playlist.
 - Liked Songs and personal 1–5 star track ratings.
 - Recently played collections, derived from the tracks you start.
+- Track title/artist/album edits, genre, language, tags and private notes are stored separately on this device in
+  `cinematic.track-metadata.v1`; original imported audio files and picker records are not rewritten.
 - Playlist membership, likes, ratings and play history stay on this device in
   `cinematic.personal.v1`; there are no accounts, cloud uploads or sync.
 - The demo preview remains read-only and separate from your real collection.
