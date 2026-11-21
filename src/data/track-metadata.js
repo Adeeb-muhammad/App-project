@@ -11,6 +11,7 @@ const MAX_FIELD = 160;
 const MAX_TAGS = 12;
 const MAX_TAG_LENGTH = 40;
 const MAX_NOTES = 1200;
+const MAX_LYRICS = 12000;
 
 function storage() {
   try {
@@ -28,6 +29,11 @@ function cleanText(value, max = MAX_FIELD) {
 function cleanNotes(value) {
   if (typeof value !== 'string') return '';
   return value.replace(/\r\n?/g, '\n').trim().slice(0, MAX_NOTES);
+}
+
+function cleanLyrics(value) {
+  if (typeof value !== 'string') return '';
+  return value.replace(/\\r\\n?/g, '\\n').trim().slice(0, MAX_LYRICS);
 }
 
 function cleanTags(value) {
@@ -64,6 +70,7 @@ function normaliseEntry(input) {
     language: cleanText(input.language, 80),
     tags: cleanTags(input.tags),
     notes: cleanNotes(input.notes),
+    lyrics: cleanLyrics(input.lyrics),
   };
 }
 
@@ -135,7 +142,7 @@ export function applyTrackMetadata(track, overrides = loadTrackMetadata()) {
   if (!track || typeof track !== 'object') return track;
   const metadata = overrides?.[track.id];
   if (!metadata) {
-    return { ...track, genre: '', language: '', tags: [], notes: '' };
+    return { ...track, genre: '', language: '', tags: [], notes: '', lyrics: '' };
   }
   return {
     ...track,

@@ -91,6 +91,13 @@ test('metadata overlays update library grouping without mutating the source reco
   assert.equal(sourceRecord.title, 'File title');
 });
 
+test('lyrics are stored locally and bounded', () => {
+  assert.equal(saveTrackMetadata(trackId, { title: 'T', artist: 'A', albumTitle: 'B', lyrics: 'line one\\nline two' }), true);
+  assert.equal(getTrackMetadata(trackId).lyrics, 'line one\\nline two');
+  assert.equal(saveTrackMetadata(trackId, { title: 'T', artist: 'A', albumTitle: 'B', lyrics: 'l'.repeat(15000) }), true);
+  assert.equal(getTrackMetadata(trackId).lyrics.length, 12000);
+});
+
 test('metadata values are bounded and tags are unique and capped', () => {
   const tags = Array.from({ length: 15 }, (_, index) => `tag-${index}`);
   assert.equal(saveTrackMetadata(trackId, {

@@ -125,6 +125,10 @@ function shellMarkup({ demo }) {
             <input class="search__input" name="tags" maxlength="500" placeholder="dreamy, late night, focus" autocomplete="off" />
             <span class="track-editor__field-hint">Separate tags with commas. Up to 12 tags.</span>
           </label>
+          <label class="track-editor__field track-editor__field--wide">Lyrics
+            <textarea class="search__input" name="lyrics" rows="8" maxlength="12000" placeholder="Paste lyrics you have permission to use…"></textarea>
+            <span class="track-editor__field-hint">Lyrics stay on this device.</span>
+          </label>
           <label class="track-editor__field track-editor__field--wide">Private notes
             <textarea class="search__input" name="notes" rows="4" maxlength="1200" placeholder="Your own notes about this track…"></textarea>
           </label>
@@ -305,7 +309,7 @@ export function mountShell(root) {
       if (!track || track.source !== 'local' || !editor || !form) return;
 
       editor.dataset.trackId = track.id;
-      for (const field of ['title', 'artist', 'albumTitle', 'genre', 'language', 'notes']) {
+      for (const field of ['title', 'artist', 'albumTitle', 'genre', 'language', 'notes', 'lyrics']) {
         const control = form.elements.namedItem(field);
         if (control) control.value = track[field] ?? '';
       }
@@ -460,6 +464,7 @@ export function mountShell(root) {
       language: value('language'),
       tags: value('tags'),
       notes: value('notes'),
+      lyrics: value('lyrics'),
     });
     if (!saved) {
       showNotice('Could not save those details. Check the required fields and available storage.');
