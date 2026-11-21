@@ -40,6 +40,8 @@ import { playlistsPage } from '../pages/playlists.js';
 import { playlistPage } from '../pages/playlist.js';
 import { albumPage } from '../pages/album.js';
 import { playerPage } from '../pages/player.js';
+import { discoverPage } from '../pages/discover.js';
+import { youtubePlayerPage } from '../pages/youtube-player.js';
 import { settingsPage } from '../pages/settings.js';
 import { notFoundPage } from '../pages/not-found.js';
 
@@ -50,6 +52,8 @@ const PAGES = {
   playlist: playlistPage,
   album: albumPage,
   player: playerPage,
+  discover: discoverPage,
+  youtubePlayer: youtubePlayerPage,
   settings: settingsPage,
   notFound: notFoundPage,
 };
