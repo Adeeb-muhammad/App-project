@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="false"
@@ -24,8 +25,26 @@
             </intent-filter>
 
         </activity>
+
+        <!-- MediaSessionService owns playback so audio survives backgrounding and the
+             notification / lock-screen controls work. It is the only exported component. -->
+        <service
+            android:name=".PlaybackService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
     </application>
 
-    <!-- Intentionally no <uses-permission> in this source manifest: the V1 app is fully offline.
-         Libraries may add app-private entries to the merged manifest; see docs/SECURITY.md. -->
+    <!-- Media playback only. No storage permission is requested: the Storage Access
+         Framework grants access to the exact documents the user picks. See docs/SECURITY.md. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Media3's datasource manifest adds network-state access for streaming. This app
+         plays only local documents, so remove the merged permission and stay fully offline. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
 </manifest>

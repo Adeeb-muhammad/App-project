@@ -37,8 +37,27 @@ test('both backup mechanisms exclude every domain and include nothing', () => {
   }
 });
 
-test('source manifest requests no permissions and declares no FileProvider', () => {
-  assert.ok(!/<uses-permission\b/.test(manifest));
+test('source manifest requests media permissions only, no storage access and no FileProvider', () => {
+  const permissions = [...manifest.matchAll(/<uses-permission[^>]*>/g)]
+    .filter((match) => !match[0].includes('tools:node="remove"'))
+    .map((match) => match[0].match(/android:name="([^"]+)"/)[1])
+    .sort();
+  assert.deepEqual(permissions, [
+    'android.permission.FOREGROUND_SERVICE',
+    'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK',
+    'android.permission.POST_NOTIFICATIONS',
+    'android.permission.WAKE_LOCK',
+  ]);
+  for (const forbidden of [
+    'READ_EXTERNAL_STORAGE',
+    'WRITE_EXTERNAL_STORAGE',
+    'READ_MEDIA_AUDIO',
+    'MANAGE_EXTERNAL_STORAGE',
+  ]) {
+    assert.ok(!manifest.includes(forbidden), `${forbidden} must not be requested`);
+  }
+  assert.match(manifest, /android:name="\.PlaybackService"/);
+  assert.match(manifest, /android:foregroundServiceType="mediaPlayback"/);
   assert.ok(!/FileProvider/.test(manifest));
   assert.ok(!existsSync(new URL('../android/app/src/main/res/xml/file_paths.xml', import.meta.url)));
 });

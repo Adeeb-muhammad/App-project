@@ -32,6 +32,16 @@ function queueRows(player) {
     .join('');
 }
 
+function engineNote(player) {
+  if (player.engine === 'native') {
+    return 'AndroidX Media3 · keeps playing in the background with notification and lock-screen controls';
+  }
+  if (player.engine === 'unavailable') {
+    return 'Native playback requires the Android app — this browser cannot play local audio';
+  }
+  return 'UI preview · playback is simulated, no audio engine is connected yet';
+}
+
 function queueDialog(player) {
   return `<dialog class="queue-sheet" data-role="queue" aria-labelledby="queue-title">
     <div class="queue-sheet__head">
@@ -43,7 +53,7 @@ function queueDialog(player) {
         ${icon('close', { size: 18 })}
       </button>
     </div>
-    <p class="queue-sheet__meta">${pluralise(player.queue.length, 'track')} in this preview queue</p>
+    <p class="queue-sheet__meta">${pluralise(player.queue.length, 'track')} in this queue</p>
     <ul class="queue-list" data-queue="player-queue">${queueRows(player)}</ul>
   </dialog>`;
 }
@@ -64,9 +74,9 @@ function emptyPlayer(state) {
         title: 'Nothing playing',
         description: state.demo
           ? 'Choose a track from the library to preview the player. This is a visual simulation only.'
-          : 'Your player will come alive once local music import is available. The screen is ready for native playback in a later milestone.',
+          : 'Import an audio file from your device and it will appear here, ready to play through AndroidX Media3.',
         hint: import.meta.env.DEV && !state.demo
-          ? 'Tip: add ?demo=1 to preview the full player with sample tracks.'
+          ? 'Tip: add ?demo=1 to preview the player with sample tracks.'
           : '',
         action: `<a class="button button--ghost" href="#/library">Browse the library</a>`,
       })}
@@ -105,7 +115,7 @@ function playerView(state, player) {
       </div>
 
       <div class="now-playing__scrub">
-        <label class="sr-only" for="player-scrubber">Seek preview position</label>
+        <label class="sr-only" for="player-scrubber">Seek position</label>
         <input
           id="player-scrubber"
           class="scrubber"
@@ -128,7 +138,7 @@ function playerView(state, player) {
         <button class="transport-button" type="button" data-action="previous" aria-label="Previous track">
           ${icon('previous', { size: 24 })}
         </button>
-        <button class="transport-button transport-button--play" type="button" data-action="toggle-play" data-role="transport-toggle" aria-label="${isPlaying ? 'Pause preview' : 'Play preview'}">
+        <button class="transport-button transport-button--play" type="button" data-action="toggle-play" data-role="transport-toggle" aria-label="${isPlaying ? 'Pause' : 'Play'}">
           ${icon(isPlaying ? 'pause' : 'play', { size: 30 })}
         </button>
         <button class="transport-button" type="button" data-action="next" aria-label="Next track">
@@ -136,9 +146,9 @@ function playerView(state, player) {
         </button>
       </div>
 
-      <p class="now-playing__note">
-        ${icon('sparkles', { size: 14 })}
-        <span>UI preview · playback is simulated, no audio engine is connected yet</span>
+      <p class="now-playing__note" data-role="engine-note">
+        ${icon(player.engine === 'native' ? 'disc' : 'sparkles', { size: 14 })}
+        <span>${engineNote(player)}</span>
       </p>
     </div>
 
@@ -164,7 +174,9 @@ function updateTransport(root, player) {
   const button = root.querySelector('[data-role="transport-toggle"]');
   if (!button) return;
   button.innerHTML = icon(player.isPlaying ? 'pause' : 'play', { size: 30 });
-  button.setAttribute('aria-label', player.isPlaying ? 'Pause preview' : 'Play preview');
+  button.setAttribute('aria-label', player.isPlaying ? 'Pause' : 'Play');
+  const note = root.querySelector('[data-role="engine-note"] span');
+  if (note) note.textContent = engineNote(player);
   const section = root.querySelector('.now-playing');
   if (section) section.classList.toggle('is-playing', player.isPlaying);
 }
@@ -173,7 +185,7 @@ export const playerPage = {
   title: 'Now playing',
   render(state) {
     const player = getPlayerState();
-    if (!state.demo || !player.track) return emptyPlayer(state);
+    if (!player.track) return emptyPlayer(state);
     return playerView(state, player);
   },
 

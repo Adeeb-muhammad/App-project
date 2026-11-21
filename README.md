@@ -2,13 +2,15 @@
 
 An offline-first personal music player for Android with a cinematic, dark interface.
 The frontend is plain HTML5, CSS3 and vanilla JavaScript (ES modules) built with Vite,
-packaged for Android with Capacitor 8. Native playback will use AndroidX Media3 in a
-later milestone.
+packaged for Android with Capacitor 8. Audio plays through AndroidX Media3 ExoPlayer in a
+`MediaSessionService`, so it continues in the background and responds to notification and
+lock-screen controls.
 
-**Current state: Milestone 1 — frontend foundation.** All five planned screens plus album
-and playlist detail exist, the interface is polished and responsive, a deliberate
-development-only demo library can be enabled, and a Capacitor Android project has been
-generated. No audio playback, music import or persistence exists yet — deliberately.
+**Current state: Milestone 2A — real local playback (vertical slice).** The five planned
+screens plus album and playlist detail exist, and a file picked with Android’s document
+picker is imported, remembered and played for real. The browser build explains that native
+playback needs the Android app; the opt-in demo mode (`?demo=1`) still uses a clearly
+labelled simulation.
 
 Version: `0.1.0`
 
@@ -42,7 +44,7 @@ http://localhost:5173/?demo=1#/
 
 - Demo mode is **off by default** and is never persisted to storage.
 - A fixed "Dev preview" chip appears while it is active.
-- The Now Playing screen states clearly that transport is a UI simulation.
+- The Now Playing screen states clearly that transport is a simulation.
 - All albums, artists, titles and SVG artwork are original and fictional.
 
 ## Android / Capacitor
@@ -56,11 +58,20 @@ npx cap open android          # open in Android Studio (requires the native tool
 npm run android:debug         # build + sync + ./gradlew assembleDebug
 ```
 
-Environment note: the machines used so far had **no JDK and no Android SDK**, so no APK has
-been built locally. A `Build` GitHub Actions workflow (web build + Android debug build) is written
-but **not yet active**: it sits at `docs/ci/build.yml` because the token used to push has no
-permission to create files under `.github/workflows/`. Move it there (instructions in the
-file's header) to enable CI; until it has run, no Android build has been verified by anyone. See [docs/TESTING.md](docs/TESTING.md) for exactly what was and was not verified.
+With JDK 21 and Android SDK 36 installed, `./gradlew testDebugUnitTest assembleDebug
+assembleDebugAndroidTest` succeeds and produces `android/app/build/outputs/apk/debug/app-debug.apk`.
+The APK has **not** been installed on a physical device or emulator from this environment, so
+picker, audio, background playback and notification/lock-screen controls still need a device
+pass. See [docs/TESTING.md](docs/TESTING.md) for exactly what was and was not verified.
+
+### Importing and playing a file
+
+1. Open **Library** and press **Import audio**.
+2. Pick one audio file with Android’s document picker.
+3. The app takes a persistable read grant for that URI only; no storage permission is used.
+4. The track appears in Library and can be played, paused, seeked and stopped.
+5. Playback is owned by `PlaybackService` (Media3 `MediaSessionService`), so it continues
+   when the app is backgrounded and through the notification / lock-screen controls.
 
 ### Tests and CI
 
@@ -69,16 +80,22 @@ npm test         # unit tests (Node built-in runner, no extra dependencies)
 npm run verify   # tests + production build
 ```
 
-Browser flow check for Now Playing: `tests/e2e/now-playing.mjs` (needs Playwright, see the
-header of that file). Once enabled, CI runs `npm ci`, `npm test`, `npm run build`, the browser E2E, then on Android:
+Browser checks (Playwright is test-only, not a project dependency):
+
+- `tests/e2e/now-playing.mjs` — the full demo/player regression flow.
+- `tests/e2e/native-playback.mjs` — the Android-only import path and the browser’s honest
+  “native playback requires the app” fallback.
+
+GitHub Actions runs `npm ci`, `npm test`, `npm run build`, both browser checks, then on Android:
 `cap sync`, `testDebugUnitTest`, `assembleDebug`, `assembleDebugAndroidTest`, and an `aapt2`
 inspection of the built APK (package, version, permissions, backup flag).
 
 ### Versioning, privacy and security
 
 The app version lives in `package.json` only; Android reads it from there (details in
-[docs/SECURITY.md](docs/SECURITY.md)). The app requests no permissions, disables cloud
-backup and device transfer, and has no network access by design.
+[docs/SECURITY.md](docs/SECURITY.md)). The app requests only media-playback permissions
+(foreground service, media playback type, notifications, wake lock), disables cloud backup
+and device transfer, and has no network access by design.
 
 ### Renaming the app
 
@@ -103,7 +120,10 @@ src/
   components/              navigation, mini-player, album-card, song-row, artwork,
                            empty-state, section-header, icon
   state/store.js           Library + UI state
-  state/player.js          Simulated transport state (no audio)
+  state/player.js          Playback boundary: native, demo simulation or unavailable
+  native/native-audio.js   Capacitor plugin bridge to Kotlin Media3 service
+  native/audio-import.js   Storage Access Framework picker wrapper
+  data/imported.js         Imported-track validation, localStorage and view model
   data/demo-data.js        Fictional development-only library
   data/library.js          Library view model, empty by default
   utils/                   navigation (hash router), demo-mode, dom, format, safe (data boundary)
@@ -111,10 +131,10 @@ src/
 public/
   artwork/                 Eight original abstract SVG artworks
   fonts/                   Self-hosted OFL fonts (Instrument Serif, Manrope) + licences
-tests/                     Unit tests (npm test) and e2e/ browser script
-docs/ci/build.yml          CI workflow (inactive until moved to .github/workflows/)
+tests/                     Unit tests (npm test) and e2e/ browser scripts
+.github/workflows/         Active CI (web, browser E2E, Android build + APK inspection)
 docs/                      Product spec, architecture, roadmap, tasks, testing, security
-android/                   Generated Capacitor Android project
+android/                   Capacitor Android project, Media3 plugin + PlaybackService in Kotlin
 ```
 
 ## Documentation
@@ -138,9 +158,13 @@ android/                   Generated Capacitor Android project
 
 ## Known limitations
 
-- No audio playback. The transport is a visual simulation only; Media3 is not connected.
-- No music import, database or persistence. The library is empty unless `?demo=1` is used.
+- Milestone 2A imports one file at a time and stores the list in `localStorage`, not SQLite.
+  There is no automatic scanning of device music and no playlist persistence.
+- Device testing is still owed: no picker, audio, background, notification or lock-screen run
+  has been performed on real hardware. The APK compiles and its manifest was inspected; that
+  is not the same as playback being verified.
+- The browser has no audio engine by design. It explains this instead of pretending to play,
+  except in the clearly labelled `?demo=1` preview.
 - Playlist creation/editing is not implemented.
 - No app icon or splash screen has been produced yet.
-- No APK has been built or run locally; Android compilation is not verified anywhere yet (CI is written but inactive). The instrumentation test has never been executed on a device or emulator.
 - Keyboard-only and screen-reader walkthroughs and desktop layout were not inspected.

@@ -1,6 +1,42 @@
 # Tasks — Cinematic Music
 
-Last updated at the end of the Milestone 1 hardening session (project version 0.1.0).
+Last updated at the end of the Milestone 2A session (project version 0.1.0).
+
+## Milestone 2A — real local playback (branch `feature/milestone-2a-native-playback`)
+
+### Completed
+
+- [x] Kotlin `CinematicAudioPlugin` registered in `MainActivity`; JS bridge in
+      `src/native/native-audio.js` (`CinematicAudio`).
+- [x] `ACTION_OPEN_DOCUMENT` picker (`audio/*`, single file) plus
+      `takePersistableUriPermission` for lasting read access.
+- [x] Metadata via `MediaMetadataRetriever` with file-name fallbacks; imported tracks validated
+      (`content://` only), normalised and stored in `localStorage` (`cinematic.imported.v1`).
+- [x] Imported tracks build the same library view model as demo content (albums/artists grouped),
+      so Library, album detail, mini-player and Now Playing work unchanged.
+- [x] `PlaybackService : MediaSessionService` with a single `ExoPlayer`, audio attributes,
+      noisy-headphone handling, local wake mode and a `MediaSession` notification/lock-screen.
+- [x] JS player has `native`, `simulation` and `unavailable` engines. Native state is projected
+      from `MediaController` events; background resume re-syncs with `getState()`.
+- [x] Browser without Capacitor explains that playback needs the Android app instead of faking
+      transport; `?demo=1` remains a clearly labelled simulation.
+- [x] Manifest permissions limited to `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK`,
+      `POST_NOTIFICATIONS`, `WAKE_LOCK`; `ACCESS_NETWORK_STATE` from Media3 removed with
+      `tools:node="remove"`. No storage or media-library permission.
+- [x] Unit/policy tests (42 Node tests + 3 Android host tests), browser E2E, Kotlin/Java
+      compilation, debug APK and instrumentation APK all pass (see `TESTING.md`).
+- [x] CI workflow updated for the new permissions and the native browser E2E.
+
+### Not verified
+
+- [ ] **No physical device or emulator was available** (`adb devices` empty). The picker, real
+      audio output, background playback, notification controls and lock-screen controls were
+      not exercised at runtime.
+- [ ] Instrumentation tests were **compiled** into `app-debug-androidTest.apk`, not executed.
+- [ ] `POST_NOTIFICATIONS` denial and URI-grant revocation paths are only handled defensively,
+      not tested.
+- [ ] Embedded artwork extraction, folder/multi-file import and SQLite persistence remain out of
+      scope for this milestone.
 
 ## Completed
 
@@ -90,10 +126,9 @@ Last updated at the end of the Milestone 1 hardening session (project version 0.
       call sites migrated; library filters tolerate non-string metadata.
 - [x] 21 unit/policy tests (`npm test`) and a 39-check Playwright run of the full Now Playing flow
       against a production build (see `TESTING.md`).
-- [ ] CI: workflow written (web, e2e, Android jobs), validated with actionlint, but **not
-      active and never run**. It is at `docs/ci/build.yml`; the push token has no workflow
-      permission. Move it to `.github/workflows/build.yml` and confirm the first run; expect
-      to iterate on the Android and e2e jobs.
+- [x] CI: workflow now lives at `.github/workflows/build.yml` and is enabled (moved after the
+      hardening session). Milestone 2A updates its permission allowlist and adds the native
+      browser E2E. No CI result from this branch is recorded; local results are in `TESTING.md`.
 
 ## Integration session (branch `claude/final-hardening-integration`)
 
@@ -110,9 +145,9 @@ Last updated at the end of the Milestone 1 hardening session (project version 0.
 
 ## Not verified / incomplete
 
-- [ ] Android debug APK: **not built locally** (no JDK/SDK/Gradle download access). Only an
-      enabled CI run or a local build can show it; do not treat the APK as working until a CI run (or a local build) succeeds
-      and the APK is installed on a device.
+- [x] Android debug APK: **built locally in Milestone 2A** with Temurin JDK 21 and SDK 36
+      (`app/build/outputs/apk/debug/app-debug.apk`, manifest inspected). Installing and running it
+      on a device is still pending; a compiled APK is not proof of working playback.
 - [ ] Instrumentation tests never executed on an emulator/device (CI would only compile them).
 - [ ] Desktop responsive layout not inspected visually.
 - [ ] Keyboard-only walkthrough and screen-reader spot check not performed.

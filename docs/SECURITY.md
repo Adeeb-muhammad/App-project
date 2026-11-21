@@ -28,9 +28,9 @@ either reading.
 What is verified: the XML is well-formed and `tests/android-policy.test.js` asserts the
 source files (every domain excluded in both sections, no `<include>`, `allowBackup="false"`,
 rules referenced). It was confirmed to fail when a line is removed. **Not verified:** that a
-real device actually skips this app during `bmgr` cloud backup or D2D migration, and that the
-Android toolchain accepts the file (never compiled). `adb shell bmgr` / a D2D migration on
-Android 12+ hardware is the check still owed.
+real device actually skips this app during `bmgr` cloud backup or D2D migration. The file is
+accepted by the Android toolchain now that the debug APK builds, but `adb shell bmgr` / a D2D
+migration on Android 12+ hardware is the runtime check still owed.
 
 Consequence: reinstalling or migrating to a new phone does **not** restore the library
 database or playlists. A deliberate, user-initiated local export/import is planned for a
@@ -39,21 +39,33 @@ is designed explicitly.
 
 ## Permissions
 
+Milestone 2A adds real playback, so the source manifest now declares exactly four permissions:
+
+| Permission | Why |
+| --- | --- |
+| `FOREGROUND_SERVICE` | `MediaSessionService` keeps playing while the app is backgrounded. |
+| `FOREGROUND_SERVICE_MEDIA_PLAYBACK` | Declares the foreground-service type required on API 34+. |
+| `POST_NOTIFICATIONS` | Media3’s playback notification on API 33+; requested at first playback. |
+| `WAKE_LOCK` | ExoPlayer’s local wake mode so audio is not cut off with the screen off. |
+
+**No storage permission is requested.** File access is the Storage Access Framework
+(`ACTION_OPEN_DOCUMENT`, `audio/*`) plus a persistable read grant for the one URI the user
+picked. There is no `READ_EXTERNAL_STORAGE`, `READ_MEDIA_AUDIO` or `MANAGE_EXTERNAL_STORAGE`,
+and no scanning of the device library.
+
 - **`INTERNET` removed.** Capacitor serves the bundled app from `https://localhost` through
-  an in-process WebView request interceptor (`androidScheme: 'https'` in
-  `capacitor.config.ts`); no socket is opened. The product has no streaming, accounts,
-  analytics, remote artwork or backend. Fonts and artwork are bundled.
-  Trade-off: `cap run --live-reload` against a dev server needs a temporary INTERNET
-  permission in a *debug-only* manifest; do not add it to `main`.
-- The **source** manifest declares no `uses-permission`. Storage/audio permissions will be
-  added with the import feature (prefer the Storage Access Framework, which needs none).
-  The **merged** manifest may still contain an app-private
-  `<package>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` entry that AndroidX Core adds; that is
-  expected and is not network or storage access. This is from knowledge of AndroidX, not yet
-  observed in a built APK here; the CI APK-inspection step fails on any other permission.
-- Guarded by `AppPackageInstrumentedTest` (device; never run yet) and an `aapt2` inspection of the
-  built debug APK in the CI workflow (`docs/ci/build.yml`, inactive until moved to
-  `.github/workflows/`).
+  an in-process WebView request interceptor (`androidScheme: 'https'`); no socket is opened.
+  Media3’s datasource manifest contributes `ACCESS_NETWORK_STATE`; the manifest removes it
+  with `tools:node="remove"` because only local documents are played.
+- The **merged** manifest may still contain an app-private
+  `<package>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` entry that AndroidX Core adds.
+  The `aapt2` inspection of the built debug APK confirmed exactly the four permissions above
+  plus that app-private entry, and no network or storage permission.
+- `PlaybackService` is exported because `MediaSessionService` must be bindable by system media
+  components; it has no other exported surface beyond `MainActivity`.
+- Guarded by `AppPackageInstrumentedTest` and `PlaybackServiceInstrumentedTest` (compiled, not
+  yet run on a device), `tests/native-contract.test.js`, `tests/android-policy.test.js`, and an
+  `aapt2` inspection in CI.
 
 ## FileProvider
 

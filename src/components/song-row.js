@@ -5,14 +5,14 @@ import { icon } from './icon.js';
 
 /**
  * A song row is a single button: the whole row is the play target, which keeps
- * touch, mouse and keyboard behaviour identical. The accessible label states
- * that this is a UI preview so the control never implies real audio.
+ * touch, mouse and keyboard behaviour identical. Whether audio is simulated or
+ * native is stated on the Now Playing screen, where the engine is known.
  */
 export function songRow(track, { number = null, showArtwork = true } = {}) {
   const title = escapeHtml(track.title);
   const artist = escapeHtml(track.artist);
   const album = escapeHtml(track.albumTitle);
-  const label = `Play ${track.title} by ${track.artist} (UI preview)`;
+  const label = `Play ${track.title} by ${track.artist}`;
 
   return `<li class="song-row-item">
     <button class="song-row" type="button" data-action="play-track" data-track-id="${escapeHtml(track.id)}" aria-label="${escapeHtml(label)}">

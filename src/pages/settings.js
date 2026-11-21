@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { demoPreviewHref } from '../utils/demo-mode.js';
 import { icon } from '../components/icon.js';
+import { isAndroidNative } from '../native/native-audio.js';
 
 const VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0';
 
@@ -32,6 +33,7 @@ export const settingsPage = {
   title: 'Settings',
   render(state) {
     const { demo, library } = state;
+    const native = isAndroidNative();
 
     return `<div class="screen screen--settings">
       <header class="screen-head">
@@ -62,7 +64,7 @@ export const settingsPage = {
           ${row({
             iconName: 'music',
             label: 'Imported tracks',
-            hint: 'Tracks currently available in the library.',
+            hint: 'Audio files you picked with Android’s document picker.',
             value: `${library.songs.length} ${library.songs.length === 1 ? 'track' : 'tracks'}`,
           })}
         </div>
@@ -74,8 +76,12 @@ export const settingsPage = {
           ${row({
             iconName: 'disc',
             label: 'Audio engine',
-            hint: 'Native playback will use AndroidX Media3 and a MediaSessionService.',
-            tag: 'Planned',
+            hint: native
+              ? 'AndroidX Media3 ExoPlayer inside a MediaSessionService, with background and lock-screen controls.'
+              : demo
+                ? 'Simulated transport for the development preview; no audio is decoded.'
+                : 'Native playback is only available in the Android app.',
+            value: native ? 'Media3' : demo ? 'Simulation' : 'Unavailable',
           })}
           ${row({
             iconName: 'settings',
@@ -92,7 +98,7 @@ export const settingsPage = {
           ${row({ iconName: 'info', label: 'Application', hint: 'Temporary project name.', value: 'Cinematic Music' })}
           ${row({ iconName: 'info', label: 'Version', hint: 'Frontend prototype build.', value: VERSION })}
           ${row({ iconName: 'info', label: 'Platform', hint: 'Runtime currently hosting the interface.', value: platformLabel() })}
-          ${row({ iconName: 'disc', label: 'Library mode', hint: 'Where the current library snapshot comes from.', value: demo ? 'Development preview' : 'Empty · no import yet' })}
+          ${row({ iconName: 'disc', label: 'Library mode', hint: 'Where the current library snapshot comes from.', value: demo ? 'Development preview' : library.hasContent ? 'Imported local files' : 'Empty · no import yet' })}
         </div>
       </section>
 

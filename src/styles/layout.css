@@ -85,6 +85,31 @@
   animation: pulse 2.4s ease-in-out infinite;
 }
 
+/* ---------- Transient notice ---------- */
+
+.app-notice {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 74px);
+  left: 50%;
+  z-index: 60;
+  width: min(560px, calc(100vw - 32px));
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  background: rgba(25, 27, 37, 0.97);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+  box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.95);
+  transform: translateX(-50%);
+  animation: screen-in 0.2s var(--ease) both;
+}
+
+.app-notice[hidden] {
+  display: none;
+}
+
 /* ---------- Main ---------- */
 
 .app-main {

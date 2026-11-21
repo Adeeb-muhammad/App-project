@@ -7,6 +7,7 @@ import { albumCard } from '../components/album-card.js';
 import { emptyState } from '../components/empty-state.js';
 import { icon } from '../components/icon.js';
 import { songRow } from '../components/song-row.js';
+import { isAndroidNative } from '../native/native-audio.js';
 
 const TABS = [
   { id: 'songs', label: 'Songs' },
@@ -63,7 +64,7 @@ function emptyCopy(tab, searching) {
     songs: {
       title: 'No songs yet',
       description:
-        'Songs you import from this device will appear here, with artwork and duration read from the files themselves.',
+        'Choose an audio file from this device and it will appear here, ready to play through AndroidX Media3.',
     },
     albums: {
       title: 'No albums yet',
@@ -135,6 +136,20 @@ export const libraryPage = {
         <h1 class="screen-head__title" tabindex="-1">Library</h1>
         <p class="screen-head__sub">${library.hasContent ? `${pluralise(total, tab === 'songs' ? 'song' : tab === 'albums' ? 'album' : 'artist')} in ${tab}.` : 'Everything you import will be organised here automatically.'}</p>
       </header>
+
+      ${state.demo
+        ? ''
+        : `<div class="import-bar">
+        <div class="import-bar__text">
+          <p class="import-bar__title">Add music from this device</p>
+          <p class="import-bar__hint">${isAndroidNative()
+            ? 'Uses Android’s document picker. Only the file you choose is opened — no access to your whole library.'
+            : 'Available in the Android app. The browser preview cannot open device files.'}</p>
+        </div>
+        <button class="button button--primary button--small" type="button" data-action="import-audio">
+          ${icon('folder', { size: 15 })} Import audio
+        </button>
+      </div>`}
 
       ${tabs(tab)}
 
