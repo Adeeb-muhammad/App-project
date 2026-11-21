@@ -8,6 +8,7 @@ import {
   saveTrackMetadata,
   STORAGE_KEY,
 } from '../src/data/track-metadata.js';
+import { filterSongs } from '../src/data/library.js';
 import {
   addImportedTrack,
   buildImportedLibrary,
@@ -123,6 +124,20 @@ test('applying metadata returns a copy and provides defaults for unedited tracks
   assert.equal(untouched.notes, '');
   assert.equal(original.genre, undefined);
   assert.equal(original.title, 'Source');
+});
+
+test('edited genre, language and tags are included in local song search', () => {
+  const song = {
+    title: 'Track',
+    artist: 'Artist',
+    albumTitle: 'Album',
+    genre: 'Ambient',
+    language: 'Japanese',
+    tags: ['late night', 'dreamy'],
+  };
+  assert.equal(filterSongs([song], 'ambient').length, 1);
+  assert.equal(filterSongs([song], 'japanese').length, 1);
+  assert.equal(filterSongs([song], 'late night').length, 1);
 });
 
 test('metadata can be reset and malformed storage is ignored safely', () => {
