@@ -196,7 +196,7 @@ test('YouTube downloads become ordinary local tracks', () => {
   const executeCall = downloadPlugin.indexOf('YoutubeDL.getInstance().execute(');
   assert.ok(updaterCall >= 0 && executeCall > updaterCall,
     'run the throttled yt-dlp update policy before executing a download');
-  assert.match(downloadPlugin, /CHECK_INTERVAL_MS/);
+  assert.match(downloadPlugin, /YtDlpUpdatePolicy\.isCheckDue/);
   assert.match(downloadPlugin, /LAST_UPDATE_CHECK_MS/);
   const updatePolicy = read('android/app/src/main/java/com/personal/cinematicmusic/YtDlpUpdatePolicy.kt');
   assert.match(updatePolicy, /24L \* 60L \* 60L \* 1000L/);
