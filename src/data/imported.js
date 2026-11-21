@@ -209,7 +209,9 @@ export function buildImportedLibrary(input = []) {
     artists,
     playlists: personal.playlists,
     likedSongs: personal.likedSongs,
-    recentlyPlayed: personal.recentlyPlayed,
+    recentlyPlayed: personal.recentlyPlayed
+      .map((track) => albums.find((album) => album.id === track.albumId))
+      .filter(Boolean),
     recentlyAdded: albums.slice(0, 5),
     favourites: albums.filter((album) => album.favourite),
     featured: albums[0] ?? null,
