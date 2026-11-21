@@ -468,6 +468,11 @@ export function mountShell(root) {
 
     editor.close?.();
     refreshLibrary();
+    const updatedTrack = findTrack(getState().library, trackId);
+    const route = parseRoute();
+    if (route.name === 'album' && updatedTrack?.albumId && route.id !== updatedTrack.albumId) {
+      navigate(`/albums/${encodeURIComponent(updatedTrack.albumId)}`);
+    }
     showNotice('Track details saved on this device.');
   });
 
