@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Narrowest possible surface: one app-private folder, no external storage.
-     Downloaded MP3s are handed to the library as content:// URIs through this
-     provider, so the player keeps its "local documents only" rule. -->
-<paths>
-    <files-path name="youtube-downloads" path="downloads/" />
-</paths>
