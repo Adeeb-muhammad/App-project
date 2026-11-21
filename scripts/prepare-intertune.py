@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import re
 import subprocess
-import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,6 +31,20 @@ except subprocess.CalledProcessError as exc:
 
 if actual != PIN:
     fail(f"expected pinned InterTune commit {PIN}, found {actual}; review patches before changing the pin")
+
+# The Full flavor needs FFmpeg's prebuilt shared libraries as well as the ffMetadataEx submodule.
+FFMPEG = ANDROID / "ffMetadataEx" / "ffmpeg-android-maker"
+if not (FFMPEG / "output" / "lib").is_dir() or not (FFMPEG / "output" / "include").is_dir():
+    if FFMPEG.exists():
+        fail(f"FFmpeg directory exists but its prebuilt output is missing: {FFMPEG}")
+    try:
+        subprocess.check_call([
+            "git", "clone", "--depth", "1", "--branch", "audio",
+            "https://github.com/mikooomich/ffmpeg-android-maker-prebuilt.git",
+            str(FFMPEG),
+        ])
+    except subprocess.CalledProcessError as exc:
+        fail(f"could not fetch the prebuilt FFmpeg libraries: {exc}")
 
 def source(relative: str) -> Path:
     path = ANDROID / relative
