@@ -6,7 +6,7 @@ packaged for Android with Capacitor 8. Audio plays through AndroidX Media3 ExoPl
 `MediaSessionService`, so it continues in the background and responds to notification and
 lock-screen controls.
 
-**Current state: Milestone 2A — real local playback (vertical slice).** The five planned
+**Current state: Milestone 2B — local playback and personal library collections.** The five planned
 screens plus album and playlist detail exist, and a file picked with Android’s document
 picker is imported, remembered and played for real. The browser build explains that native
 playback needs the Android app; the opt-in demo mode (`?demo=1`) still uses a clearly
@@ -72,6 +72,15 @@ pass. See [docs/TESTING.md](docs/TESTING.md) for exactly what was and was not ve
 4. The track appears in Library and can be played, paused, seeked and stopped.
 5. Playback is owned by `PlaybackService` (Media3 `MediaSessionService`), so it continues
    when the app is backgrounded and through the notification / lock-screen controls.
+
+### Personal library features
+
+- Create, rename and delete playlists; add tracks from Library and remove them from a playlist.
+- Liked Songs and personal 1–5 star track ratings.
+- Recently played collections, derived from the tracks you start.
+- Playlist membership, likes, ratings and play history stay on this device in
+  `cinematic.personal.v1`; there are no accounts, cloud uploads or sync.
+- The demo preview remains read-only and separate from your real collection.
 
 ### YouTube audio import and yt-dlp updates
 
@@ -178,6 +187,6 @@ android/                   Capacitor Android project, Media3 plugin + PlaybackSe
   is not the same as playback being verified.
 - The browser has no audio engine by design. It explains this instead of pretending to play,
   except in the clearly labelled `?demo=1` preview.
-- Playlist creation/editing is not implemented.
+- Personal playlists, Liked Songs, track ratings and recent-play history are stored in localStorage; a SQLite migration and export/import are still future work.
 - No app icon or splash screen has been produced yet.
 - Keyboard-only and screen-reader walkthroughs and desktop layout were not inspected.
