@@ -122,12 +122,12 @@ mark_not_translatable(fr, [
 set_string(
     en,
     "enable_dynamic_theme_description",
-    "Take the app's colours from the cover of the song that is playing. Off, or with nothing playing, it uses your phone's own colours.",
+    r"Take the app\'s colours from the cover of the song that is playing. Off, or with nothing playing, it uses your phone\'s own colours.",
 )
 set_string(
     fr,
     "enable_dynamic_theme_description",
-    "Reprendre les couleurs de l'application depuis la pochette du titre en cours de lecture. Désactivé, ou sans lecture, elle utilise les couleurs de votre téléphone.",
+    r"Reprendre les couleurs de l\'application depuis la pochette du titre en cours de lecture. Désactivé, ou sans lecture, elle utilise les couleurs de votre téléphone.",
 )
 set_string(en, "catch_up_all_answered", "Thank you, %1$s!")
 set_string(fr, "catch_up_all_answered", "Merci, %1$s !")
