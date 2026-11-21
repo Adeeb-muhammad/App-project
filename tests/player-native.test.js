@@ -38,6 +38,12 @@ function fakeBridge(overrides = {}) {
     previous() {
       calls.push(['previous']);
     },
+    setShuffleEnabled(enabled) {
+      calls.push(['setShuffleEnabled', enabled]);
+    },
+    setRepeatMode(mode) {
+      calls.push(['setRepeatMode', mode]);
+    },
     getState: async () => null,
     subscribe(handler) {
       listener = handler;
@@ -137,6 +143,26 @@ test('play, pause, seek and next are forwarded to the native service', () => {
   assert.deepEqual(bridge.calls.at(-1), ['next']);
   player.previous();
   assert.deepEqual(bridge.calls.at(-1), ['previous']);
+});
+
+test('shuffle and repeat modes are forwarded to Media3 bridge', () => {
+  const bridge = fakeBridge();
+  player.configurePlayback({ mode: 'native', bridge });
+  player.playTrack(tracks, 't1');
+
+  player.setShuffleEnabled(true);
+  player.cycleRepeatMode();
+  player.cycleRepeatMode();
+
+  assert.deepEqual(bridge.calls.filter(([name]) => name === 'setShuffleEnabled'), [
+    ['setShuffleEnabled', true],
+  ]);
+  assert.deepEqual(bridge.calls.filter(([name]) => name === 'setRepeatMode'), [
+    ['setRepeatMode', 'track'],
+    ['setRepeatMode', 'queue'],
+  ]);
+  assert.equal(player.getPlayerState().shuffleEnabled, true);
+  assert.equal(player.getPlayerState().repeatMode, 'queue');
 });
 
 test('syncFromNative pulls service state without a playback event', async () => {
