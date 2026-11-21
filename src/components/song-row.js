@@ -4,7 +4,7 @@ import { artwork } from './artwork.js';
 import { icon } from './icon.js';
 
 /** A playable track row with independent personal-library actions. */
-export function songRow(track, { number = null, showArtwork = true, playlistId = null } = {}) {
+export function songRow(track, { number = null, showArtwork = true, playlistId = null, showUtilities = true } = {}) {
   const title = escapeHtml(track.title);
   const artist = escapeHtml(track.artist);
   const album = escapeHtml(track.albumTitle);
@@ -27,7 +27,7 @@ export function songRow(track, { number = null, showArtwork = true, playlistId =
       <span class="song-row__duration">${formatTime(track.duration)}</span>
       <span class="song-row__play" aria-hidden="true">${icon('play', { size: 15 })}</span>
     </button>
-    <div class="song-row__utilities">
+${showUtilities ? `<div class="song-row__utilities">
       <button class="song-row__utility${favourite ? ' is-active' : ''}" type="button"
         data-action="toggle-favourite" data-track-id="${escapeHtml(track.id)}"
         aria-label="${favourite ? 'Remove from' : 'Add to'} Liked Songs" aria-pressed="${favourite}"
@@ -36,6 +36,6 @@ export function songRow(track, { number = null, showArtwork = true, playlistId =
         data-track-id="${escapeHtml(track.id)}" aria-label="Add ${title} to a playlist"
         title="Add to playlist">＋</button>
       ${removeAction}
-    </div>
+    </div>` : ''}
   </li>`;
 }
