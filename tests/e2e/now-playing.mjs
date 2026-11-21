@@ -98,7 +98,7 @@ check('editing did not rewrite the original imported record',
   untouchedImport?.title === 'Original Title' && untouchedImport?.album === 'Original Album');
 const savedOverlay = await page.evaluate((uri) => JSON.parse(localStorage.getItem('cinematic.track-metadata.v1') || '{}')[uri], metadataTrackUri);
 check('tags are deduplicated in local metadata', savedOverlay?.tags?.join('|') === 'dreamy|late night');
-await editor.locator('[data-action="close-track-editor"]').click();
+await editor.locator('[data-action="close-track-editor"]').first().click();
 await page.evaluate(() => {
   localStorage.removeItem('cinematic.imported.v1');
   localStorage.removeItem('cinematic.track-metadata.v1');
