@@ -28,7 +28,7 @@ Vite (build/dev) ──► dist/ ──► Capacitor WebView (Android)
 | `src/state/player.js` | Playback boundary. Projects native Media3 state, runs the demo simulation, or reports that a browser cannot play local audio. |
 | `src/native/native-audio.js` | Registers the `CinematicAudio` Capacitor plugin and adapts its listener API. |
 | `src/native/audio-import.js` | Opens the Storage Access Framework picker and validates its result. |
-| `src/data/imported.js` | Validates `content://` tracks, persists them in `localStorage`, and builds the library view model. |
+| `src/data/imported.js` | Validates `content://` tracks, persists them in `localStorage`, and builds the library view model. |\n| `src/data/personal-library.js` | Stores local playlists, Liked Songs, 1–5 star ratings and recent-play metadata under `cinematic.personal.v1`. |
 | `src/data/library.js` | Builds the view model (`albums`, `songs`, `artists`, `playlists`, rails) and selectors/filters. Empty by default. |
 | `src/data/demo-data.js` | Fictional development-only catalogue with artwork paths and palettes. |
 | `src/utils/navigation.js` | Hash router: `parseRoute`, `navigate`, `goBack`, `subscribe`, `href`. |
@@ -83,7 +83,7 @@ while navigating.
 
 ### `store.js`
 
-Holds `{ demo, library, ui }`. `subscribe` drives a re-render of the active route.
+Holds `{ demo, library, ui }`. The imported library view model merges audio metadata with the separate on-device personal-library record. `subscribe` drives a re-render of the active route.
 `setUi(patch, { notify: false })` is used by the library search so typing filters the result
 container locally instead of rebuilding the screen and losing focus.
 
