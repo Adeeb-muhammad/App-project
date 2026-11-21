@@ -55,10 +55,10 @@ jobs:
       - run: node tests/e2e/native-playback.mjs
 
   android:
-    name: Android (unit tests, debug APK, test-APK compile, APK inspection)
+    name: Android (Full variant, tests, APK inspection)
     runs-on: ubuntu-latest
     needs: web
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -76,23 +76,25 @@ jobs:
           java-version: 21
       - uses: android-actions/setup-android@v3
         with:
-          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0 cmake;3.31.6 ndk;29.0.13113456'
       - uses: gradle/actions/setup-gradle@v4
       - name: Apply pinned InterTune compatibility fixes
         run: python3 scripts/prepare-intertune.py
+      - name: Resolve prebuilt FFmpeg libraries for the Full variant
+        run: git clone --depth 1 --branch audio https://github.com/mikooomich/ffmpeg-android-maker-prebuilt.git android/ffMetadataEx/ffmpeg-android-maker
       - name: Host unit tests
         working-directory: android
-        run: ./gradlew :app:testCoreDebugUnitTest
-      - name: Build InterTune debug APK
+        run: ./gradlew :app:testFullDebugUnitTest
+      - name: Build InterTune Full debug APK
         working-directory: android
-        run: ./gradlew :app:assembleCoreDebug
+        run: ./gradlew :app:assembleFullDebug
       - name: Compile instrumentation tests (no emulator on the runner)
         working-directory: android
-        run: ./gradlew :app:assembleCoreDebugAndroidTest
+        run: ./gradlew :app:assembleFullDebugAndroidTest
       - name: Inspect the built APK (package, version, permissions)
         run: |
           set -euo pipefail
-          APK=$(find android/app/build/outputs/apk/core/debug -maxdepth 1 -type f -name '*.apk' | head -n 1)
+          APK=$(find android/app/build/outputs/apk/full/debug -maxdepth 1 -type f -name '*.apk' | head -n 1)
           test -n "$APK" && test -f "$APK"
           AAPT2=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
           BADGING=$("$AAPT2" dump badging "$APK")
@@ -101,11 +103,11 @@ jobs:
           echo "$BADGING" | grep -q "versionName='0.12.11'"
           echo "$BADGING" | grep -q "uses-permission: name='android.permission.INTERNET'"
           echo "$BADGING" | grep -q "uses-permission: name='android.permission.READ_MEDIA_AUDIO'"
-          echo "Inspected: $APK"
+          echo "Inspected Full variant: $APK"
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: intertune-core-debug-apk
-          path: android/app/build/outputs/apk/core/debug/*.apk
+          name: intertune-full-debug-apk
+          path: android/app/build/outputs/apk/full/debug/*.apk
           if-no-files-found: error
           retention-days: 14
