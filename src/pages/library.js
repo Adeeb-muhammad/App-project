@@ -3,7 +3,7 @@ import { href } from '../utils/navigation.js';
 import { pluralise } from '../utils/format.js';
 import { refreshLibrary, setUi } from '../state/store.js';
 import { addImportedTrack } from '../data/imported.js';
-import { filterAlbums, filterArtists, filterSongs } from '../data/library.js';
+import { getLibraryItems, LIBRARY_FILTER_OPTIONS, LIBRARY_SORT_OPTIONS } from '../data/library.js';
 import { albumCard } from '../components/album-card.js';
 import { emptyState } from '../components/empty-state.js';
 import { icon } from '../components/icon.js';
@@ -103,7 +103,38 @@ function emptyCopy(tab, searching) {
   return copy[tab] ?? copy.songs;
 }
 
-export function resultsHtml(library, tab, search, { editable = true } = {}) {
+function selectOptions(options, selected) {
+  return options.map((option) =>
+    `<option value="${escapeHtml(option.value)}"${option.value === selected ? ' selected' : ''}>${escapeHtml(option.label)}</option>`,
+  ).join('');
+}
+
+function libraryTools(search, tab, filter, sort) {
+  const filterOptions = LIBRARY_FILTER_OPTIONS[tab] ?? LIBRARY_FILTER_OPTIONS.songs;
+  const sortOptions = LIBRARY_SORT_OPTIONS[tab] ?? LIBRARY_SORT_OPTIONS.songs;
+  const activeFilter = filterOptions.some((option) => option.value === filter) ? filter : 'all';
+  const activeSort = sortOptions.some((option) => option.value === sort) ? sort : 'default';
+
+  return `<div class="library-tools">
+    <div class="search" role="search">
+      <span class="search__icon" aria-hidden="true">${icon('search', { size: 18 })}</span>
+      <label class="sr-only" for="library-search">Search your library</label>
+      <input id="library-search" class="search__input" type="search" data-role="library-search" placeholder="Search songs, albums, artists" autocomplete="off" spellcheck="false" value="${escapeHtml(search)}" />
+    </div>
+    <div class="library-tools__controls">
+      ${filterOptions.length > 1 ? `<label class="library-control" for="library-filter">
+        <span>Filter</span>
+        <select id="library-filter" class="library-control__select" data-role="library-filter">${selectOptions(filterOptions, activeFilter)}</select>
+      </label>` : ''}
+      <label class="library-control" for="library-sort">
+        <span>Sort by</span>
+        <select id="library-sort" class="library-control__select" data-role="library-sort">${selectOptions(sortOptions, activeSort)}</select>
+      </label>
+    </div>
+  </div>`;
+}
+
+export function resultsHtml(library, tab, search, { editable = true, filter = 'all', sort = 'default' } = {}) {
   const query = String(search ?? '');
   if (!library.hasContent) {
     return emptyState({
@@ -113,17 +144,13 @@ export function resultsHtml(library, tab, search, { editable = true } = {}) {
     });
   }
 
-  const filtered = {
-    songs: () => filterSongs(library.songs, query),
-    albums: () => filterAlbums(library.albums, query),
-    artists: () => filterArtists(library.artists, query),
-  }[tab]();
+  const filtered = getLibraryItems(library, tab, query, filter, sort);
 
   if (filtered.length === 0) {
     return emptyState({
       iconName: 'search',
       ...emptyCopy(tab, true),
-      hint: 'Search checks titles, artists and album names.',
+      hint: query ? 'Search checks titles, artists and album names.' : 'Try another filter or clear the search.',
     });
   }
 
@@ -132,13 +159,9 @@ export function resultsHtml(library, tab, search, { editable = true } = {}) {
   return artistList(filtered);
 }
 
-function resultAnnouncement(library, tab, search) {
+function resultAnnouncement(library, tab, search, filter, sort) {
   if (!library.hasContent) return 'Library is empty.';
-  const count = {
-    songs: () => filterSongs(library.songs, search).length,
-    albums: () => filterAlbums(library.albums, search).length,
-    artists: () => filterArtists(library.artists, search).length,
-  }[tab]();
+  const count = getLibraryItems(library, tab, search, filter, sort).length;
   return `${count} ${count === 1 ? 'result' : 'results'} in ${tab}.`;
 }
 
@@ -147,6 +170,14 @@ export const libraryPage = {
     const tab = route?.tab ?? 'songs';
     const { library } = state;
     const search = state.ui.search ?? '';
+    const filterOptions = LIBRARY_FILTER_OPTIONS[tab] ?? LIBRARY_FILTER_OPTIONS.songs;
+    const sortOptions = LIBRARY_SORT_OPTIONS[tab] ?? LIBRARY_SORT_OPTIONS.songs;
+    const filter = filterOptions.some((option) => option.value === state.ui.libraryFilter)
+      ? state.ui.libraryFilter
+      : 'all';
+    const sort = sortOptions.some((option) => option.value === state.ui.librarySort)
+      ? state.ui.librarySort
+      : 'default';
     const total = {
       songs: library.songs.length,
       albums: library.albums.length,
@@ -178,20 +209,12 @@ export const libraryPage = {
 
       ${tabs(tab)}
 
-      ${
-        library.hasContent
-          ? `<div class="search" role="search">
-              <span class="search__icon" aria-hidden="true">${icon('search', { size: 18 })}</span>
-              <label class="sr-only" for="library-search">Search your library</label>
-              <input id="library-search" class="search__input" type="search" data-role="library-search" placeholder="Search songs, albums, artists" autocomplete="off" spellcheck="false" value="${escapeHtml(search)}" />
-            </div>`
-          : ''
-      }
+      ${library.hasContent ? libraryTools(search, tab, filter, sort) : ''}
 
-      <p class="sr-only" role="status" aria-live="polite" data-role="result-count">${resultAnnouncement(library, tab, search)}</p>
+      <p class="sr-only" role="status" aria-live="polite" data-role="result-count">${resultAnnouncement(library, tab, search, filter, sort)}</p>
 
       <div class="library-results" data-role="library-results">
-        ${resultsHtml(library, tab, search, { editable: !state.demo })}
+        ${resultsHtml(library, tab, search, { editable: !state.demo, filter, sort })}
       </div>
     </div>`;
   },
@@ -200,17 +223,44 @@ export const libraryPage = {
     const cleanups = [];
 
     const input = root.querySelector('[data-role="library-search"]');
+    const filterSelect = root.querySelector('[data-role="library-filter"]');
+    const sortSelect = root.querySelector('[data-role="library-sort"]');
     const results = root.querySelector('[data-role="library-results"]');
     const announcement = root.querySelector('[data-role="result-count"]');
     if (input && results) {
       const tab = route?.tab ?? 'songs';
+      const updateResults = () => {
+        const search = input.value;
+        const filter = filterSelect?.value ?? 'all';
+        const sort = sortSelect?.value ?? 'default';
+        results.innerHTML = resultsHtml(state.library, tab, search, {
+          editable: !state.demo,
+          filter,
+          sort,
+        });
+        if (announcement) {
+          announcement.textContent = resultAnnouncement(state.library, tab, search, filter, sort);
+        }
+      };
       const onInput = () => {
         setUi({ search: input.value }, { notify: false });
-        results.innerHTML = resultsHtml(state.library, tab, input.value, { editable: !state.demo });
-        if (announcement) announcement.textContent = resultAnnouncement(state.library, tab, input.value);
+        updateResults();
       };
+      const onFilterChange = () => {
+        setUi({ libraryFilter: filterSelect.value }, { notify: false });
+        updateResults();
+      };
+      const onSortChange = () => {
+        setUi({ librarySort: sortSelect.value }, { notify: false });
+        updateResults();
+      };
+
       input.addEventListener('input', onInput);
+      filterSelect?.addEventListener('change', onFilterChange);
+      sortSelect?.addEventListener('change', onSortChange);
       cleanups.push(() => input.removeEventListener('input', onInput));
+      if (filterSelect) cleanups.push(() => filterSelect.removeEventListener('change', onFilterChange));
+      if (sortSelect) cleanups.push(() => sortSelect.removeEventListener('change', onSortChange));
     }
 
     const form = root.querySelector('[data-role="youtube-form"]');

@@ -137,3 +137,112 @@ export function filterArtists(artists, query) {
   if (!term) return artists;
   return artists.filter((artist) => String(artist.name ?? '').toLowerCase().includes(term));
 }
+
+
+/** Filter options are deliberately local and only expose data the library owns. */
+export const LIBRARY_FILTER_OPTIONS = Object.freeze({
+  songs: [
+    { value: 'all', label: 'All songs' },
+    { value: 'liked', label: 'Liked Songs' },
+    { value: 'rated', label: 'Rated songs' },
+  ],
+  albums: [
+    { value: 'all', label: 'All albums' },
+    { value: 'favourites', label: 'Favourites' },
+  ],
+  artists: [
+    { value: 'all', label: 'All artists' },
+  ],
+});
+
+export const LIBRARY_SORT_OPTIONS = Object.freeze({
+  songs: [
+    { value: 'default', label: 'Default order' },
+    { value: 'title-asc', label: 'Title A–Z' },
+    { value: 'artist-asc', label: 'Artist A–Z' },
+    { value: 'duration-asc', label: 'Shortest first' },
+    { value: 'duration-desc', label: 'Longest first' },
+    { value: 'added-desc', label: 'Recently added' },
+  ],
+  albums: [
+    { value: 'default', label: 'Default order' },
+    { value: 'title-asc', label: 'Album A–Z' },
+    { value: 'artist-asc', label: 'Artist A–Z' },
+    { value: 'added-desc', label: 'Recently added' },
+  ],
+  artists: [
+    { value: 'default', label: 'Default order' },
+    { value: 'name-asc', label: 'Name A–Z' },
+    { value: 'tracks-desc', label: 'Most tracks' },
+  ],
+});
+
+const libraryCollator = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: 'base',
+});
+
+function compareText(left, right) {
+  return libraryCollator.compare(String(left ?? ''), String(right ?? ''));
+}
+
+function compareNumber(left, right) {
+  const a = Number(left);
+  const b = Number(right);
+  return (Number.isFinite(a) ? a : 0) - (Number.isFinite(b) ? b : 0);
+}
+
+/** Applies a supported filter without mutating the source collection. */
+export function filterLibraryItems(items, tab, filter = 'all') {
+  const source = Array.isArray(items) ? items : [];
+  if (tab === 'songs' && filter === 'liked') {
+    return source.filter((track) => track.isFavourite === true);
+  }
+  if (tab === 'songs' && filter === 'rated') {
+    return source.filter((track) => Number(track.rating) >= 1 && Number(track.rating) <= 5);
+  }
+  if (tab === 'albums' && filter === 'favourites') {
+    return source.filter((album) => album.favourite === true);
+  }
+  return source.slice();
+}
+
+/** Sorts a copy so the library's underlying import and playlist order is untouched. */
+export function sortLibraryItems(items, tab, sort = 'default') {
+  const source = Array.isArray(items) ? items.slice() : [];
+  const comparisons = {
+    songs: {
+      'title-asc': (a, b) => compareText(a.title, b.title),
+      'artist-asc': (a, b) => compareText(a.artist, b.artist) || compareText(a.title, b.title),
+      'duration-asc': (a, b) => compareNumber(a.duration, b.duration),
+      'duration-desc': (a, b) => compareNumber(b.duration, a.duration),
+      'added-desc': (a, b) => compareNumber(b.addedAt, a.addedAt),
+    },
+    albums: {
+      'title-asc': (a, b) => compareText(a.title, b.title),
+      'artist-asc': (a, b) => compareText(a.artist, b.artist) || compareText(a.title, b.title),
+      'added-desc': (a, b) => compareNumber(b.addedAt, a.addedAt),
+    },
+    artists: {
+      'name-asc': (a, b) => compareText(a.name, b.name),
+      'tracks-desc': (a, b) => compareNumber(b.trackCount, a.trackCount) || compareText(a.name, b.name),
+    },
+  };
+  const compare = comparisons[tab]?.[sort];
+  if (!compare) return source;
+
+  return source
+    .map((item, index) => ({ item, index }))
+    .sort((left, right) => compare(left.item, right.item) || left.index - right.index)
+    .map(({ item }) => item);
+}
+
+/** Shared search → filter → sort pipeline for the Library screen and count. */
+export function getLibraryItems(library, tab, query = '', filter = 'all', sort = 'default') {
+  const searched = {
+    songs: () => filterSongs(library?.songs ?? [], query),
+    albums: () => filterAlbums(library?.albums ?? [], query),
+    artists: () => filterArtists(library?.artists ?? [], query),
+  }[tab]?.() ?? [];
+  return sortLibraryItems(filterLibraryItems(searched, tab, filter), tab, sort);
+}

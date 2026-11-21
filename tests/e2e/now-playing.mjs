@@ -53,6 +53,23 @@ const rendersDuring = async (fn) => { const before = await page.evaluate(() => w
 
 // 1-3: demo mode, album, start playback
 await goto(`${BASE}?demo=1#/library/albums`);
+
+// Library tools: alphabetic sorting, favourite filtering and combined search.
+const defaultAlbumOrder = await page.locator('.album-card__title').allTextContents();
+await page.locator('[data-role="library-sort"]').selectOption('title-asc');
+const sortedAlbumTitles = await page.locator('.album-card__title').allTextContents();
+const expectedAlbumTitles = [...defaultAlbumOrder].sort((a, b) =>
+  a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }),
+);
+check('album sorting is alphabetic', JSON.stringify(sortedAlbumTitles) === JSON.stringify(expectedAlbumTitles));
+await page.locator('[data-role="library-filter"]').selectOption('favourites');
+check('favourite album filter shows only favourites', await page.locator('.album-card').count() === 4);
+await page.locator('[data-role="library-search"]').fill('Afterglow');
+check('search combines with active album filter', (await page.locator('.album-card__title').allTextContents()).join('') === 'Afterglow');
+await page.locator('[data-role="library-search"]').fill('');
+await page.locator('[data-role="library-filter"]').selectOption('all');
+await page.locator('[data-role="library-sort"]').selectOption('default');
+
 await page.locator('a.album-card').first().click();
 await page.waitForSelector('[data-action="play-album"]');
 check('album page open', (await page.locator('h1').textContent()).length > 0);

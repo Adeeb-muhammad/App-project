@@ -21,7 +21,7 @@ This document tracks the Joytify capabilities being adapted into Cinematic Music
 | Playlist create, edit, delete and assign tracks | Existing local feature | Extend with sort/arrangement options |
 | Liked Songs and 5-star ratings | Existing local feature | Retain |
 | Recently played | Existing local feature | Expand into listening history and stats |
-| Advanced search | Basic local song/album/artist filtering exists | Add combined results, filters, sort and pagination suitable for a local catalogue |
+| Advanced search | Implemented in this PR | Search, per-section filters and sorting across local songs, albums and artists |
 | Song, album and artist pages | Album detail exists; artist detail is derived only | Add rich local detail pages and discography |
 | Lyrics and song comments | Not implemented | Add local lyrics display and private notes/comments; remote public comments require accounts/backend |
 | Music uploads and metadata | Local audio import exists | Add local metadata editing, tags, genres, language and artwork; do not upload without a configured server |
@@ -48,7 +48,7 @@ This document tracks the Joytify capabilities being adapted into Cinematic Music
 
 ### Batch 2 — Queue and library management (in progress)
 - Queue editing implemented in this PR: play next, move upcoming tracks, remove upcoming tracks and clear upcoming tracks while keeping the active track playing.
-- Search all local songs/albums/artists with useful filtering and sorting.
+- Advanced local search implemented in this PR: filter Liked Songs / rated songs / favourite albums and sort songs, albums and artists.
 - Edit imported metadata and add tags, genres, language, lyrics and private notes.
 
 ### Batch 3 — Discovery and personalisation
@@ -65,4 +65,4 @@ This document tracks the Joytify capabilities being adapted into Cinematic Music
 
 ## Current implementation note
 
-PR #11 merged the shuffle/repeat controls after web, browser E2E and Android CI passed. This queue-management PR keeps Android Media3 as the playback engine and preserves the current track position when the queue is edited. Physical-device verification is still required for native queue editing.
+PR #11 merged shuffle/repeat; PR #12 merged queue management after web, browser E2E and Android CI passed. The library filter/sort feature keeps catalogue operations on-device and never mutates the import order. Physical-device verification is still required for native queue editing.
