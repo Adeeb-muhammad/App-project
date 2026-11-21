@@ -68,9 +68,11 @@ test('queue edits add next, reorder, remove and clear upcoming without losing th
   player.configurePlayback({ mode: 'simulation' });
   player.playTrack(tracks, 't1');
   player.seekRatio(0.42);
+  player.setShuffleEnabled(true);
 
   assert.equal(player.enqueueNext(tracks[2]), true);
   let state = player.getPlayerState();
+  assert.equal(state.shuffleEnabled, false);
   assert.deepEqual(state.queue.map((track) => track.id), ['t1', 't3', 't2']);
   assert.equal(state.index, 0);
   assert.equal(state.track.id, 't1');
