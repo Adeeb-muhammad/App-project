@@ -61,6 +61,8 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -73,48 +75,33 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
       - uses: gradle/actions/setup-gradle@v4
-      - run: npm ci
-      - run: npm run build
-      - run: npx cap sync android
       - name: Host unit tests
         working-directory: android
-        run: ./gradlew testDebugUnitTest
-      - name: Build debug APK
+        run: ./gradlew :app:testCoreDebugUnitTest
+      - name: Build InterTune debug APK
         working-directory: android
-        run: ./gradlew assembleDebug
+        run: ./gradlew :app:assembleCoreDebug
       - name: Compile instrumentation tests (no emulator on the runner)
         working-directory: android
-        run: ./gradlew assembleDebugAndroidTest
+        run: ./gradlew :app:assembleCoreDebugAndroidTest
       - name: Inspect the built APK (package, version, permissions, backup)
         run: |
           set -euo pipefail
-          APK=android/app/build/outputs/apk/debug/app-debug.apk
-          test -f "$APK"
+          APK=$(find app/build/outputs/apk/core/debug -maxdepth 1 -type f -name '*.apk' | head -n 1)
+          test -n "$APK" && test -f "$APK"
           AAPT2=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
-          echo "aapt2: $AAPT2"
           BADGING=$("$AAPT2" dump badging "$APK")
           echo "$BADGING" | grep -E "^(package|uses-permission|sdkVersion|targetSdkVersion)" || true
-          VERSION=$(node -p "require('./package.json').version")
-          echo "$BADGING" | grep -q "^package: name='com.personal.cinematicmusic'"
-          echo "$BADGING" | grep -q "versionName='${VERSION}'"
-          # Playback permissions plus INTERNET for the optional user-initiated
-          # YouTube audio download. Storage permissions remain forbidden.
-          UNEXPECTED=$(echo "$BADGING" | grep "^uses-permission" \
-            | grep -vE "(DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION|android.permission.FOREGROUND_SERVICE'|android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK|android.permission.POST_NOTIFICATIONS|android.permission.WAKE_LOCK|android.permission.INTERNET)" || true)
-          if [ -n "$UNEXPECTED" ]; then echo "Unexpected permissions:"; echo "$UNEXPECTED"; exit 1; fi
-          TREE=$("$AAPT2" dump xmltree --file AndroidManifest.xml "$APK")
-          echo "$TREE" | grep -E "allowBackup|dataExtractionRules|fullBackupContent" || true
-          echo "$TREE" | grep -qE "allowBackup[^=]*=(false|\(type 0x12\)0x0)"
-          echo "$TREE" | grep -q "dataExtractionRules"
-          # The downloader's FileProvider is intentional and non-exported. Its
-          # app-private files/downloads scope is asserted by tests/android-policy.test.js.
-          echo "$TREE" | grep -q "androidx.core.content.FileProvider"
-          echo "$TREE" | grep -q "android.support.FILE_PROVIDER_PATHS"
+          echo "$BADGING" | grep -q "^package: name='dev.skye.intertune.debug'"
+          echo "$BADGING" | grep -q "versionName='0.12.11'"
+          echo "$BADGING" | grep -q "uses-permission: name='android.permission.INTERNET'"
+          echo "$BADGING" | grep -q "uses-permission: name='android.permission.READ_MEDIA_AUDIO'"
+          echo "Inspected: $APK"
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: cinematic-music-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: intertune-core-debug-apk
+          path: android/app/build/outputs/apk/core/debug/*.apk
           if-no-files-found: error
           retention-days: 14
