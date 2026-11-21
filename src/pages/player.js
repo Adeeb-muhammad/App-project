@@ -142,6 +142,11 @@ ${state.demo ? '' : `        <div class="track-rating" role="group" aria-label="
         </div>`}
       </div>
 
+      <section class="lyrics-panel" data-role="lyrics-panel" aria-labelledby="lyrics-title">
+        <h2 id="lyrics-title">Lyrics</h2>
+        ${track.lyrics?.trim() ? `<pre class="lyrics-panel__text">${escapeHtml(track.lyrics)}</pre>` : '<p class="lyrics-panel__empty">No lyrics added for this track yet. Add them in Edit track details.</p>'}
+      </section>
+
       <div class="now-playing__scrub">
         <label class="sr-only" for="player-scrubber">Seek position</label>
         <input
