@@ -50,6 +50,38 @@ test('metadata falls back safely and durations convert from milliseconds', () =>
   assert.equal(track.source, 'local');
 });
 
+test('YouTube video IDs stay out of downloaded track titles and display filenames', () => {
+  const track = normaliseImportedTrack({
+    uri: contentUri,
+    fileName: 'Night Drive [4NRXx6U8ABQ].mp3',
+    title: 'Night Drive [4NRXx6U8ABQ]',
+    artist: 'Nova',
+  });
+
+  assert.equal(track.title, 'Night Drive');
+  assert.equal(track.fileName, 'Night Drive.mp3');
+  assert.equal(track.artist, 'Nova');
+  assert.equal(track.uri, contentUri, 'the underlying audio file URI must not change');
+});
+
+test('YouTube ID cleanup only removes an exact trailing 11-character ID suffix', () => {
+  const ordinary = normaliseImportedTrack({
+    uri: contentUri,
+    fileName: 'Live Set [Extended Version].mp3',
+    title: 'Live Set [Extended Version]',
+  });
+  const nonTrailing = normaliseImportedTrack({
+    uri: 'content://media/external/audio/media/11',
+    fileName: 'Live Set [ABCDEFGHIJK] Remastered.mp3',
+    title: 'Live Set [ABCDEFGHIJK] Remastered',
+  });
+
+  assert.equal(ordinary.title, 'Live Set [Extended Version]');
+  assert.equal(ordinary.fileName, 'Live Set [Extended Version].mp3');
+  assert.equal(nonTrailing.title, 'Live Set [ABCDEFGHIJK] Remastered');
+  assert.equal(nonTrailing.fileName, 'Live Set [ABCDEFGHIJK] Remastered.mp3');
+});
+
 test('titles are trimmed and bounded', () => {
   const track = normaliseImportedTrack({
     uri: contentUri,
