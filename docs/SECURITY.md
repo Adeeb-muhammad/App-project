@@ -47,20 +47,25 @@ Milestone 2A adds real playback, so the source manifest now declares exactly fou
 | `FOREGROUND_SERVICE_MEDIA_PLAYBACK` | Declares the foreground-service type required on API 34+. |
 | `POST_NOTIFICATIONS` | Media3’s playback notification on API 33+; requested at first playback. |
 | `WAKE_LOCK` | ExoPlayer’s local wake mode so audio is not cut off with the screen off. |
+| `INTERNET` | Used **only** by the optional “save a YouTube link as MP3” download. The rest of the app is local and works with no connection. |
 
 **No storage permission is requested.** File access is the Storage Access Framework
 (`ACTION_OPEN_DOCUMENT`, `audio/*`) plus a persistable read grant for the one URI the user
 picked. There is no `READ_EXTERNAL_STORAGE`, `READ_MEDIA_AUDIO` or `MANAGE_EXTERNAL_STORAGE`,
 and no scanning of the device library.
 
-- **`INTERNET` removed.** Capacitor serves the bundled app from `https://localhost` through
-  an in-process WebView request interceptor (`androidScheme: 'https'`); no socket is opened.
-  Media3’s datasource manifest contributes `ACCESS_NETWORK_STATE`; the manifest removes it
-  with `tools:node="remove"` because only local documents are played.
+- **`INTERNET` is limited to downloads.** Capacitor still serves the bundled app from
+  `https://localhost` through an in-process WebView request interceptor
+  (`androidScheme: 'https'`), so the UI itself opens no socket. The permission is declared
+  because the optional download runs yt-dlp against a URL the user pasted; nothing is sent
+  anywhere else, there is no analytics or telemetry, and playback remains fully offline once
+  a file is saved. Media3’s datasource manifest contributes `ACCESS_NETWORK_STATE`; the
+  manifest removes it with `tools:node="remove"` because only local documents are played
+  (yt-dlp opens sockets directly and does not need the connectivity state).
 - The **merged** manifest may still contain an app-private
   `<package>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` entry that AndroidX Core adds.
-  The `aapt2` inspection of the built debug APK confirmed exactly the four permissions above
-  plus that app-private entry, and no network or storage permission.
+  The `aapt2` inspection of the built debug APK confirmed exactly the five permissions above
+  plus that app-private entry, and no storage permission.
 - `PlaybackService` is exported because `MediaSessionService` must be bindable by system media
   components; it has no other exported surface beyond `MainActivity`.
 - Guarded by `AppPackageInstrumentedTest` and `PlaybackServiceInstrumentedTest` (compiled, not
@@ -70,11 +75,19 @@ and no scanning of the device library.
 ## FileProvider
 
 The template `FileProvider` and `file_paths.xml` (which exposed all of external storage via
-`<external-path path="."/>`) were **removed**. Capacitor core only references it for
-(a) camera capture through an HTML `<input type=file capture>` and (b) notification-asset
-helpers in plugins. The app uses neither and has no file inputs. If a future plugin needs
-it, re-add a provider restricted to a single sub-directory of `cache-path`, never
-`external-path` with `path="."`.
+`<external-path path="."/>`) were **removed**, then reintroduced deliberately for the download
+feature — scoped as that note required, to a single app-private folder:
+
+- one provider, `androidx.core.content.FileProvider`, authority `${applicationId}.downloads`,
+  `android:exported="false"`, `grantUriPermissions="true"`;
+- `res/xml/download_paths.xml` contains exactly `<files-path name="youtube-downloads"
+  path="downloads/" />` — no `external-path`, `root-path` or `external-files-path`;
+- it exists so a downloaded MP3 can be handed to the library as a `content://` URI, keeping
+  the player’s rule that only content URIs are ever enqueued. Files stay inside the app’s
+  private `files/downloads/` directory and are removed with the app.
+
+`tests/android-policy.test.js` asserts the authority, `exported="false"` and the absence of
+external paths, so widening it later fails the suite.
 
 ## Signing credentials
 
