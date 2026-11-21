@@ -376,7 +376,8 @@ function commitQueueEdit(queue, index) {
   state.queue = queue;
   state.index = safeIndex;
   state.track = track;
-  state.duration = Number(track.duration) || 0;
+  const trackDuration = Number(track.duration);
+  state.duration = trackDuration > 0 ? trackDuration : trackChanged ? 0 : previous.duration;
   state.position = trackChanged
     ? 0
     : Math.min(state.position, state.duration || state.position);
