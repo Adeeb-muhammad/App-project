@@ -1,4 +1,4 @@
-import { delegate } from '../utils/dom.js';
+import { delegate, escapeHtml } from '../utils/dom.js';
 import {
   goBack,
   navigate,
@@ -7,6 +7,14 @@ import {
 } from '../utils/navigation.js';
 import { getState, refreshLibrary, subscribe as subscribeStore } from '../state/store.js';
 import { addImportedTrack } from '../data/imported.js';
+import {
+  addTrackToPlaylist,
+  deletePlaylist,
+  recordTrackPlayed,
+  removeTrackFromPlaylist,
+  setTrackRating,
+  toggleFavourite,
+} from '../data/personal-library.js';
 import { pickAudioTrack } from '../native/audio-import.js';
 import {
   getPlayerState,
@@ -63,6 +71,22 @@ function shellMarkup({ demo }) {
     <main id="app-main" class="app-main" tabindex="-1"></main>
 
     <div class="mini-player-slot" data-role="mini-player-slot"></div>
+
+    <dialog class="playlist-picker" data-role="playlist-picker" aria-labelledby="playlist-picker-title">
+      <div class="playlist-picker__head">
+        <div>
+          <p class="eyebrow">Your collection</p>
+          <h2 id="playlist-picker-title">Add to playlist</h2>
+        </div>
+        <button class="icon-button" type="button" data-action="close-playlist-picker" aria-label="Close">×</button>
+      </div>
+      <label class="sr-only" for="playlist-picker-target">Choose a playlist</label>
+      <select id="playlist-picker-target" class="search__input" data-role="playlist-picker-target"></select>
+      <div class="playlist-picker__actions">
+        <button class="button button--ghost button--small" type="button" data-action="close-playlist-picker">Cancel</button>
+        <button class="button button--primary button--small" type="button" data-action="confirm-add-to-playlist">Add song</button>
+      </div>
+    </dialog>
 
     ${navigation()}
   </div>`;
@@ -185,6 +209,79 @@ export function mountShell(root) {
       goBack('/');
       return;
     }
+    if (action === 'toggle-favourite') {
+      const trackId = element.dataset.trackId;
+      if (!trackId) return;
+      const favourite = toggleFavourite(trackId);
+      refreshLibrary();
+      showNotice(favourite ? 'Added to Liked Songs.' : 'Removed from Liked Songs.');
+      return;
+    }
+    if (action === 'add-to-playlist') {
+      const trackId = element.dataset.trackId;
+      const picker = root.querySelector('[data-role="playlist-picker"]');
+      const select = root.querySelector('[data-role="playlist-picker-target"]');
+      const playlists = getState().library.playlists.filter((playlist) => !playlist.isSystem);
+      if (!trackId || !picker || !select) return;
+      if (playlists.length === 0) {
+        showNotice('Create a playlist first, then add songs from your library.');
+        navigate('/playlists');
+        return;
+      }
+      select.innerHTML = playlists.map((playlist) =>
+        `<option value="${escapeHtml(playlist.id)}">${escapeHtml(playlist.name)}</option>`,
+      ).join('');
+      picker.dataset.trackId = trackId;
+      picker.showModal?.();
+      return;
+    }
+    if (action === 'close-playlist-picker') {
+      root.querySelector('[data-role="playlist-picker"]')?.close?.();
+      return;
+    }
+    if (action === 'confirm-add-to-playlist') {
+      const picker = root.querySelector('[data-role="playlist-picker"]');
+      const select = root.querySelector('[data-role="playlist-picker-target"]');
+      const trackId = picker?.dataset.trackId;
+      const playlistId = select?.value;
+      if (trackId && playlistId && addTrackToPlaylist(playlistId, trackId)) {
+        refreshLibrary();
+        showNotice('Added to your playlist.');
+      } else {
+        showNotice('That song is already in the playlist or could not be added.');
+      }
+      picker?.close?.();
+      return;
+    }
+    if (action === 'remove-from-playlist') {
+      const playlistId = element.dataset.playlistId;
+      const trackId = element.dataset.trackId;
+      if (playlistId && trackId && removeTrackFromPlaylist(playlistId, trackId)) {
+        refreshLibrary();
+        showNotice('Removed from playlist.');
+      }
+      return;
+    }
+    if (action === 'delete-playlist') {
+      const playlistId = element.dataset.playlistId;
+      const playlist = getState().library.playlists.find((entry) => entry.id === playlistId);
+      if (!playlist || playlist.isSystem) return;
+      if (!window.confirm(`Delete "${playlist.name}"?`)) return;
+      deletePlaylist(playlistId);
+      refreshLibrary();
+      if (parseRoute().name === 'playlist') navigate('/playlists');
+      showNotice('Playlist deleted.');
+      return;
+    }
+    if (action === 'rate-track') {
+      const trackId = element.dataset.trackId;
+      const rating = Number(element.dataset.rating);
+      if (trackId && setTrackRating(trackId, rating)) {
+        refreshLibrary();
+        showNotice(`Saved your ${rating}-star rating.`);
+      }
+      return;
+    }
     if (action === 'import-audio') {
       event.preventDefault();
       if (element.dataset.busy === 'true') return;
@@ -213,11 +310,15 @@ export function mountShell(root) {
       if (!trackId) return;
       const scope = element.closest('[data-queue]');
       const ids = scope
-        ? Array.from(scope.querySelectorAll('[data-track-id]')).map((node) => node.dataset.trackId)
+        ? Array.from(scope.querySelectorAll('[data-action="play-track"][data-track-id]')).map((node) => node.dataset.trackId)
         : [trackId];
       const tracks = ids
         .map((id) => findTrack(getState().library, id))
         .filter(Boolean);
+      if (tracks.some((track) => track.id === trackId)) {
+        recordTrackPlayed(trackId);
+        refreshLibrary();
+      }
       playTrack(tracks, trackId);
       navigate('/now-playing');
       return;
@@ -225,6 +326,8 @@ export function mountShell(root) {
     if (action === 'play-album') {
       const album = findAlbum(getState().library, element.dataset.albumId);
       if (!album || album.tracks.length === 0) return;
+      recordTrackPlayed(album.tracks[0].id);
+      refreshLibrary();
       playTrack(album.tracks, album.tracks[0].id);
       navigate('/now-playing');
       return;
@@ -232,6 +335,8 @@ export function mountShell(root) {
     if (action === 'play-playlist') {
       const playlist = findPlaylist(getState().library, element.dataset.playlistId);
       if (!playlist || playlist.tracks.length === 0) return;
+      recordTrackPlayed(playlist.tracks[0].id);
+      refreshLibrary();
       playTrack(playlist.tracks, playlist.tracks[0].id);
       navigate('/now-playing');
     }

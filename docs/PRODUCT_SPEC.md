@@ -66,7 +66,9 @@ playlists remain read-only demo content.
 ### Playlists (`#/playlists`)
 
 - Playlist cards with generated gradient covers, name, track count and description.
-- Designed empty state; playlist creation/editing is not implemented yet.
+- Create, rename and delete personal playlists; add tracks from Library and remove tracks from a playlist.
+- Automatic Liked Songs collection and device-local favourites.
+- Playlist membership is stored on-device and remains available offline.
 - Playlist detail (`#/playlists/:id`): collection hero, play action, track list.
 
 ### Album detail (`#/albums/:id`)
@@ -79,6 +81,7 @@ playlists remain read-only demo content.
 - Full-screen overlay with a dynamic gradient derived from the album palette.
 - Large artwork, album name and year, track title, artist.
 - Scrubber with elapsed and total time.
+- Personal 1–5 star rating for the current track.
 - Previous, play/pause and next controls; queue button opens a bottom-sheet queue.
 - Engine note that reflects reality: Media3/background playback on Android, “simulated” in
   demo mode, or “native playback requires the Android app” in a browser.

@@ -31,9 +31,9 @@ function tabs(current) {
   </nav>`;
 }
 
-function songList(songs) {
+function songList(songs, editable = true) {
   return `<ul class="song-list" data-queue="library-songs">
-    ${songs.map((song) => songRow(song)).join('')}
+    ${songs.map((song) => songRow(song, { showUtilities: editable })).join('')}
   </ul>`;
 }
 
@@ -103,7 +103,7 @@ function emptyCopy(tab, searching) {
   return copy[tab] ?? copy.songs;
 }
 
-export function resultsHtml(library, tab, search) {
+export function resultsHtml(library, tab, search, { editable = true } = {}) {
   const query = String(search ?? '');
   if (!library.hasContent) {
     return emptyState({
@@ -127,7 +127,7 @@ export function resultsHtml(library, tab, search) {
     });
   }
 
-  if (tab === 'songs') return songList(filtered);
+  if (tab === 'songs') return songList(filtered, editable);
   if (tab === 'albums') return albumGrid(filtered);
   return artistList(filtered);
 }
@@ -191,7 +191,7 @@ export const libraryPage = {
       <p class="sr-only" role="status" aria-live="polite" data-role="result-count">${resultAnnouncement(library, tab, search)}</p>
 
       <div class="library-results" data-role="library-results">
-        ${resultsHtml(library, tab, search)}
+        ${resultsHtml(library, tab, search, { editable: !state.demo })}
       </div>
     </div>`;
   },
@@ -206,7 +206,7 @@ export const libraryPage = {
       const tab = route?.tab ?? 'songs';
       const onInput = () => {
         setUi({ search: input.value }, { notify: false });
-        results.innerHTML = resultsHtml(state.library, tab, input.value);
+        results.innerHTML = resultsHtml(state.library, tab, input.value, { editable: !state.demo });
         if (announcement) announcement.textContent = resultAnnouncement(state.library, tab, input.value);
       };
       input.addEventListener('input', onInput);

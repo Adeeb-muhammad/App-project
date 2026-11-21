@@ -66,10 +66,14 @@ media buttons.
 
 ## Phase 4 — Library features
 
-- Playlist creation, rename, reorder, add/remove tracks.
-- Favourites and recently played persisted.
-- Sorting and filtering, multi-select.
-- Real search across metadata.
+**Delivered in the Joytify-inspired local collection milestone:**
+
+- Create, rename and delete personal playlists; add/remove tracks.
+- Liked Songs and favourites persisted on-device.
+- Personal 1–5 star ratings and recently played album rail.
+- Existing Library search continues to filter songs, albums and artists.
+
+**Still open:** sorting, multi-select, SQLite migration/export and richer listening statistics.
 
 ## Phase 5 — Cinematic polish
 
