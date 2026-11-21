@@ -453,11 +453,20 @@
 }
 
 .download-status {
+  box-sizing: border-box;
   flex: 1 1 100%;
+  width: 100%;
+  min-width: 0;
   margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(167, 139, 250, 0.22);
+  border-radius: 12px;
+  background: rgba(12, 13, 20, 0.52);
   color: var(--text-muted);
   font-size: 12px;
-  line-height: 1.45;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .download-status[hidden] {
