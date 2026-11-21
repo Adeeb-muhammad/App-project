@@ -97,16 +97,19 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "$BADGING" | grep -q "^package: name='com.personal.cinematicmusic'"
           echo "$BADGING" | grep -q "versionName='${VERSION}'"
-          # Media playback needs a foreground service, its mediaPlayback type,
-          # notifications and a wake lock. Anything else (especially storage) is a failure.
+          # Playback permissions plus INTERNET for the optional user-initiated
+          # YouTube audio download. Storage permissions remain forbidden.
           UNEXPECTED=$(echo "$BADGING" | grep "^uses-permission" \
-            | grep -vE "(DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION|android.permission.FOREGROUND_SERVICE'|android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK|android.permission.POST_NOTIFICATIONS|android.permission.WAKE_LOCK)" || true)
+            | grep -vE "(DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION|android.permission.FOREGROUND_SERVICE'|android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK|android.permission.POST_NOTIFICATIONS|android.permission.WAKE_LOCK|android.permission.INTERNET)" || true)
           if [ -n "$UNEXPECTED" ]; then echo "Unexpected permissions:"; echo "$UNEXPECTED"; exit 1; fi
           TREE=$("$AAPT2" dump xmltree --file AndroidManifest.xml "$APK")
           echo "$TREE" | grep -E "allowBackup|dataExtractionRules|fullBackupContent" || true
           echo "$TREE" | grep -qE "allowBackup[^=]*=(false|\(type 0x12\)0x0)"
           echo "$TREE" | grep -q "dataExtractionRules"
-          ! echo "$TREE" | grep -q "FileProvider"
+          # The downloader's FileProvider is intentional and non-exported. Its
+          # app-private files/downloads scope is asserted by tests/android-policy.test.js.
+          echo "$TREE" | grep -q "androidx.core.content.FileProvider"
+          echo "$TREE" | grep -q "android.support.FILE_PROVIDER_PATHS"
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4

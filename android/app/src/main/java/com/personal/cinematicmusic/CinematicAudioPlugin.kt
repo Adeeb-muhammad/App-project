@@ -53,6 +53,7 @@ class CinematicAudioPlugin : Plugin() {
      */
     private var pendingController: ListenableFuture<MediaController>? = null
 
+    @Volatile
     private var destroyed = false
 
     /**
@@ -220,11 +221,13 @@ class CinematicAudioPlugin : Plugin() {
         }
 
         val safeIndex = PlaybackPolicy.startIndex(startIndex, items.size)
-        lastItems = items
-        lastIndex = safeIndex
-        lastPositionMs = 0L
 
-        withController(call) { mediaController ->
+        // A new queue replaces the old queue; do not restore stale items first.
+        withController(call, restoreQueue = false) { mediaController ->
+            lastItems = items
+            lastIndex = safeIndex
+            lastPositionMs = 0L
+            lastWasPlaying = autoplay
             mediaController.setMediaItems(items, safeIndex, 0L)
             mediaController.prepare()
             if (autoplay) mediaController.play() else mediaController.pause()
@@ -254,28 +257,37 @@ class CinematicAudioPlugin : Plugin() {
 
     @PluginMethod
     fun stop(call: PluginCall) {
-        lastItems = emptyList()
-        lastIndex = 0
-        lastPositionMs = 0L
-        lastWasPlaying = false
-        val mediaController = controller
-        if (mediaController == null) {
-            call.resolve()
-            return
+        dispatchToControllerThread {
+            lastItems = emptyList()
+            lastIndex = 0
+            lastPositionMs = 0L
+            lastWasPlaying = false
+            handler.removeCallbacks(ticker)
+
+            val mediaController = controller
+            if (mediaController?.isConnected != true) {
+                call.resolve()
+                return@dispatchToControllerThread
+            }
+
+            try {
+                mediaController.stop()
+                mediaController.clearMediaItems()
+                emitPlaybackState(mediaController)
+                call.resolve()
+            } catch (error: Exception) {
+                Log.e(PlaybackErrors.TAG, "could not stop playback", error)
+                call.reject("Playback command failed: ${error.message ?: error.javaClass.simpleName}", error)
+            }
         }
-        mediaController.stop()
-        mediaController.clearMediaItems()
-        handler.removeCallbacks(ticker)
-        emitPlaybackState(mediaController)
-        call.resolve()
     }
 
     @PluginMethod
     fun seekTo(call: PluginCall) {
-        val positionMs = call.getLong("positionMs") ?: 0L
-        lastPositionMs = positionMs.coerceAtLeast(0L)
+        val positionMs = (call.getLong("positionMs") ?: 0L).coerceAtLeast(0L)
         withController(call) { mediaController ->
-            mediaController.seekTo(lastPositionMs)
+            lastPositionMs = positionMs
+            mediaController.seekTo(positionMs)
             call.resolve()
         }
     }
@@ -304,18 +316,9 @@ class CinematicAudioPlugin : Plugin() {
 
     @PluginMethod
     fun getState(call: PluginCall) {
-        val mediaController = controller
-        if (mediaController?.isConnected == true) {
-            call.resolve(statePayload(mediaController))
-            return
-        }
-        if (mediaController == null && pendingController == null) {
-            // Nothing is connected and nothing is connecting: report "no
-            // playback" instead of waking the service.
-            call.resolve(emptyState())
-            return
-        }
-        withController(call) { connected ->
+        // State reads may reconnect to the existing session, but must never restore
+        // a stale queue or issue play() as a side effect.
+        withController(call, restoreQueue = false) { connected ->
             call.resolve(statePayload(connected))
         }
     }
@@ -327,29 +330,55 @@ class CinematicAudioPlugin : Plugin() {
      * Concurrent callers share the same connection future, so only one
      * MediaController is ever created.
      */
-    private fun withController(call: PluginCall, block: (MediaController) -> Unit) {
+    private fun withController(
+        call: PluginCall,
+        restoreQueue: Boolean = true,
+        block: (MediaController) -> Unit,
+    ) {
+        // Capacitor invokes plugin methods on its own HandlerThread. Media3's
+        // Player API must only be touched from the controller's application looper.
+        dispatchToControllerThread {
+            withControllerOnMain(call, restoreQueue, block)
+        }
+    }
+
+    private fun withControllerOnMain(
+        call: PluginCall,
+        restoreQueue: Boolean,
+        block: (MediaController) -> Unit,
+    ) {
+        if (destroyed) {
+            call.reject(UNAVAILABLE_MESSAGE)
+            return
+        }
+
         controller?.let { existing ->
             if (existing.isConnected) {
-                restoreQueueIfNeeded(existing)
-                block(existing)
+                try {
+                    if (restoreQueue) restoreQueueIfNeeded(existing)
+                    block(existing)
+                } catch (error: Exception) {
+                    Log.e(PlaybackErrors.TAG, "playback command failed", error)
+                    call.reject(
+                        "Playback command failed: ${error.message ?: error.javaClass.simpleName}",
+                        error,
+                    )
+                }
                 return
             }
-            // The service went away: drop the dead connection and reconnect
-            // instead of sending commands into a released controller.
+
+            // The service went away: release the old controller on its own looper
+            // before requesting a fresh connection.
             Log.w(PlaybackErrors.TAG, "controller disconnected, reconnecting")
             existing.removeListener(playerListener)
             existing.release()
             controller = null
         }
 
-        if (destroyed) {
-            call.reject(UNAVAILABLE_MESSAGE)
-            return
-        }
-
         val future = pendingController ?: run {
             val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
             MediaController.Builder(context, token)
+                .setApplicationLooper(Looper.getMainLooper())
                 .buildAsync()
                 .also { pendingController = it }
         }
@@ -368,23 +397,33 @@ class CinematicAudioPlugin : Plugin() {
                         controller = mediaController
                         mediaController.addListener(playerListener)
                     } else if (current !== mediaController) {
-                        // A second connection raced the first one; keep the
-                        // player that commands are already going to.
                         mediaController.release()
                     }
+
                     val connected = controller ?: mediaController
-                    restoreQueueIfNeeded(connected)
+                    if (restoreQueue) restoreQueueIfNeeded(connected)
                     block(connected)
                 } catch (error: Exception) {
                     if (pendingController === future) pendingController = null
                     Log.e(PlaybackErrors.TAG, "could not connect to the playback service", error)
-                    call.reject(UNAVAILABLE_MESSAGE, error)
+                    call.reject(
+                        "Playback command failed: ${error.message ?: error.javaClass.simpleName}",
+                        error,
+                    )
                 }
             },
             ContextCompat.getMainExecutor(context),
         )
     }
 
+    /** Run all MediaController methods on its explicit main application looper. */
+    private fun dispatchToControllerThread(action: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            action()
+        } else {
+            handler.post { action() }
+        }
+    }
     /**
      * Pushes the remembered queue back into a player that has none.
      *
@@ -477,13 +516,15 @@ class CinematicAudioPlugin : Plugin() {
 
     override fun handleOnDestroy() {
         destroyed = true
-        handler.removeCallbacks(ticker)
-        pendingController?.cancel(true)
-        pendingController = null
-        controller?.removeListener(playerListener)
-        controller?.release()
-        controller = null
         metadataExecutor.shutdownNow()
+        dispatchToControllerThread {
+            handler.removeCallbacks(ticker)
+            pendingController?.cancel(true)
+            pendingController = null
+            controller?.removeListener(playerListener)
+            controller?.release()
+            controller = null
+        }
         super.handleOnDestroy()
     }
 

@@ -12,6 +12,9 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Looper;
 
 import androidx.core.content.ContextCompat;
 import androidx.media3.common.MediaItem;
@@ -150,6 +153,59 @@ public class PlaybackServiceInstrumentedTest {
     }
 
     /**
+     * Regression for the Capacitor thread model: Builder is invoked on a
+     * dedicated plugin thread while Player methods stay on the main looper.
+     */
+    @Test
+    public void controllerCreatedFromPluginThreadUsesMainApplicationLooper() throws Exception {
+        HandlerThread pluginThread = new HandlerThread("CapacitorPluginsTest");
+        pluginThread.start();
+        try {
+            CountDownLatch buildLatch = new CountDownLatch(1);
+            AtomicReference<ListenableFuture<MediaController>> futureRef = new AtomicReference<>();
+            AtomicReference<Throwable> buildFailure = new AtomicReference<>();
+            Handler pluginHandler = new Handler(pluginThread.getLooper());
+            SessionToken token = new SessionToken(
+                context, new ComponentName(context, PlaybackService.class));
+
+            pluginHandler.post(() -> {
+                try {
+                    futureRef.set(new MediaController.Builder(context, token)
+                        .setApplicationLooper(Looper.getMainLooper())
+                        .buildAsync());
+                } catch (Throwable error) {
+                    buildFailure.set(error);
+                } finally {
+                    buildLatch.countDown();
+                }
+            });
+
+            assertTrue("plugin thread did not finish building the controller",
+                buildLatch.await(10, TimeUnit.SECONDS));
+            if (buildFailure.get() != null) throw new AssertionError(buildFailure.get());
+            controller = awaitController(futureRef.get());
+
+            onMain(() -> {
+                controller.setMediaItem(MediaItem.fromUri(Uri.fromFile(toneFile)));
+                controller.prepare();
+                controller.play();
+                return null;
+            });
+            await("position passes 1 s from plugin-thread-created controller",
+                () -> position() > 1_000, 20_000);
+            assertTrue("controller remains playing after 1 s",
+                Boolean.TRUE.equals(onMain(() -> controller.isPlaying())));
+            await("position passes 3 s from plugin-thread-created controller",
+                () -> position() > 3_000, 20_000);
+            assertTrue("controller remains playing after 3 s",
+                Boolean.TRUE.equals(onMain(() -> controller.isPlaying())));
+            assertEquals(null, onMain(() -> controller.getPlayerError()));
+        } finally {
+            pluginThread.quitSafely();
+            pluginThread.join(5_000);
+        }
+    }
+    /**
      * The service owns the queue, so destroying the WebView side of the
      * connection must not lose it. This is what lets a reconnected controller
      * (and the restore logic in the plugin) pick playback back up.
@@ -187,7 +243,14 @@ public class PlaybackServiceInstrumentedTest {
         SessionToken token = new SessionToken(
             context, new ComponentName(context, PlaybackService.class));
         ListenableFuture<MediaController> future =
-            new MediaController.Builder(context, token).buildAsync();
+            new MediaController.Builder(context, token)
+                .setApplicationLooper(Looper.getMainLooper())
+                .buildAsync();
+        return awaitController(future);
+    }
+
+    private MediaController awaitController(ListenableFuture<MediaController> future) throws Exception {
+        assertNotNull("controller future was not created", future);
         CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<MediaController> reference = new AtomicReference<>();
         AtomicReference<Throwable> failure = new AtomicReference<>();

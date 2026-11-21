@@ -15,6 +15,7 @@ import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import java.io.File
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Downloads the audio track of a YouTube video as an MP3 and hands it back as a
@@ -35,8 +36,7 @@ class YouTubeAudioPlugin : Plugin() {
     private val worker = Executors.newSingleThreadExecutor()
     private val handler = Handler(Looper.getMainLooper())
 
-    @Volatile
-    private var downloading = false
+    private val downloadInProgress = AtomicBoolean(false)
 
     @Volatile
     private var destroyed = false
@@ -48,12 +48,10 @@ class YouTubeAudioPlugin : Plugin() {
             call.reject(YouTubeUrlPolicy.INVALID_URL_MESSAGE)
             return
         }
-        if (downloading) {
+        if (!downloadInProgress.compareAndSet(false, true)) {
             call.reject("A download is already running. Wait for it to finish.")
             return
         }
-
-        downloading = true
         val appContext = context.applicationContext
         val targetDir = File(appContext.filesDir, DOWNLOAD_DIR).apply { mkdirs() }
 
@@ -104,7 +102,7 @@ class YouTubeAudioPlugin : Plugin() {
                 val message = failureMessage(error)
                 handler.post { if (!destroyed) call.reject(message) }
             } finally {
-                downloading = false
+                downloadInProgress.set(false)
             }
         }
     }
