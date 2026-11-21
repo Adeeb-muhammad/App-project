@@ -24,7 +24,7 @@ This document tracks the Joytify capabilities being adapted into Cinematic Music
 | Advanced search | Implemented in this PR | Search, per-section filters and sorting across local songs, albums and artists |
 | Song, album and artist pages | Album detail exists; artist detail is derived only | Add rich local detail pages and discography |
 | Lyrics and song comments | Not implemented | Add local lyrics display and private notes/comments; remote public comments require accounts/backend |
-| Music uploads and metadata | Local audio import exists | Add local metadata editing, tags, genres, language and artwork; do not upload without a configured server |
+| Music uploads and metadata | Local metadata editor implemented in PR #14 | Edit title, artist, album, genre, language, tags and private notes in a local overlay; the audio file is untouched. Artwork editing and cloud upload remain separate work |
 | Personalized recommendations | Not implemented | Build on-device suggestions from local library and listening history |
 | Following musicians | Not implemented | Local follow list for artists already in the imported catalogue |
 | Notifications | App notices exist | Add local library/artist activity notifications; live cross-user notices need backend |
@@ -49,7 +49,8 @@ This document tracks the Joytify capabilities being adapted into Cinematic Music
 ### Batch 2 — Queue and library management (in progress)
 - Queue editing implemented in this PR: play next, move upcoming tracks, remove upcoming tracks and clear upcoming tracks while keeping the active track playing.
 - Advanced local search implemented in this PR: filter Liked Songs / rated songs / favourite albums and sort songs, albums and artists.
-- Edit imported metadata and add tags, genres, language, lyrics and private notes.
+- Local metadata editor implemented in PR #14: edit title, artist, album, genre, language, tags and private notes without modifying the source audio file.
+- Inline lyrics display and imported-artwork editing remain future work.
 
 ### Batch 3 — Discovery and personalisation
 - Artist and song detail pages, local following, discographies and local recommendations.
@@ -65,4 +66,4 @@ This document tracks the Joytify capabilities being adapted into Cinematic Music
 
 ## Current implementation note
 
-PR #11 merged shuffle/repeat; PR #12 merged queue management after web, browser E2E and Android CI passed. The library filter/sort feature keeps catalogue operations on-device and never mutates the import order. Physical-device verification is still required for native queue editing.
+PR #11 merged shuffle/repeat; PR #12 merged queue management after web, browser E2E and Android CI passed. The library filter/sort feature keeps catalogue operations on-device and never mutates the import order. PR #14 stores track metadata overrides separately from the original import records. Physical-device verification is still required for native queue editing.

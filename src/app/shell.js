@@ -7,6 +7,7 @@ import {
 } from '../utils/navigation.js';
 import { getState, refreshLibrary, subscribe as subscribeStore } from '../state/store.js';
 import { addImportedTrack } from '../data/imported.js';
+import { saveTrackMetadata } from '../data/track-metadata.js';
 import {
   addTrackToPlaylist,
   deletePlaylist,
@@ -92,6 +93,47 @@ function shellMarkup({ demo }) {
         <button class="button button--ghost button--small" type="button" data-action="close-playlist-picker">Cancel</button>
         <button class="button button--primary button--small" type="button" data-action="confirm-add-to-playlist">Add song</button>
       </div>
+    </dialog>
+
+    <dialog class="track-editor" data-role="track-editor" aria-labelledby="track-editor-title">
+      <form data-role="track-editor-form">
+        <div class="track-editor__head">
+          <div>
+            <p class="eyebrow">Your collection</p>
+            <h2 id="track-editor-title">Edit track details</h2>
+          </div>
+          <button class="icon-button" type="button" data-action="close-track-editor" aria-label="Close">×</button>
+        </div>
+        <p class="track-editor__hint">These changes stay on this device. Your original audio file is not modified.</p>
+        <div class="track-editor__grid">
+          <label class="track-editor__field">Title
+            <input class="search__input" name="title" maxlength="160" required autocomplete="off" />
+          </label>
+          <label class="track-editor__field">Artist
+            <input class="search__input" name="artist" maxlength="160" required autocomplete="off" />
+          </label>
+          <label class="track-editor__field">Album
+            <input class="search__input" name="albumTitle" maxlength="160" required autocomplete="off" />
+          </label>
+          <label class="track-editor__field">Genre
+            <input class="search__input" name="genre" maxlength="80" placeholder="e.g. Alternative R&B" autocomplete="off" />
+          </label>
+          <label class="track-editor__field">Language
+            <input class="search__input" name="language" maxlength="80" placeholder="e.g. English" autocomplete="off" />
+          </label>
+          <label class="track-editor__field track-editor__field--wide">Tags
+            <input class="search__input" name="tags" maxlength="500" placeholder="dreamy, late night, focus" autocomplete="off" />
+            <span class="track-editor__field-hint">Separate tags with commas. Up to 12 tags.</span>
+          </label>
+          <label class="track-editor__field track-editor__field--wide">Private notes
+            <textarea class="search__input" name="notes" rows="4" maxlength="1200" placeholder="Your own notes about this track…"></textarea>
+          </label>
+        </div>
+        <div class="track-editor__actions">
+          <button class="button button--ghost button--small" type="button" data-action="close-track-editor">Cancel</button>
+          <button class="button button--primary button--small" type="submit">Save details</button>
+        </div>
+      </form>
     </dialog>
 
     ${navigation()}
@@ -250,6 +292,32 @@ export function mountShell(root) {
       showNotice(favourite ? 'Added to Liked Songs.' : 'Removed from Liked Songs.');
       return;
     }
+    if (action === 'edit-track-metadata') {
+      event.preventDefault();
+      const state = getState();
+      if (state.demo) {
+        showNotice('Track details are read-only in the demo preview.');
+        return;
+      }
+      const track = findTrack(state.library, element.dataset.trackId);
+      const editor = root.querySelector('[data-role="track-editor"]');
+      const form = editor?.querySelector('[data-role="track-editor-form"]');
+      if (!track || track.source !== 'local' || !editor || !form) return;
+
+      editor.dataset.trackId = track.id;
+      for (const field of ['title', 'artist', 'albumTitle', 'genre', 'language', 'notes']) {
+        const control = form.elements.namedItem(field);
+        if (control) control.value = track[field] ?? '';
+      }
+      const tags = form.elements.namedItem('tags');
+      if (tags) tags.value = (track.tags ?? []).join(', ');
+      editor.showModal?.();
+      return;
+    }
+    if (action === 'close-track-editor') {
+      root.querySelector('[data-role="track-editor"]')?.close?.();
+      return;
+    }
     if (action === 'add-to-playlist') {
       const trackId = element.dataset.trackId;
       const picker = root.querySelector('[data-role="playlist-picker"]');
@@ -373,6 +441,39 @@ export function mountShell(root) {
       playTrack(playlist.tracks, playlist.tracks[0].id);
       navigate('/now-playing');
     }
+  });
+
+  root.addEventListener('submit', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || !form.matches('[data-role="track-editor-form"]')) return;
+    event.preventDefault();
+
+    const editor = root.querySelector('[data-role="track-editor"]');
+    const trackId = editor?.dataset.trackId;
+    if (!trackId) return;
+    const value = (name) => form.elements.namedItem(name)?.value ?? '';
+    const saved = saveTrackMetadata(trackId, {
+      title: value('title'),
+      artist: value('artist'),
+      albumTitle: value('albumTitle'),
+      genre: value('genre'),
+      language: value('language'),
+      tags: value('tags'),
+      notes: value('notes'),
+    });
+    if (!saved) {
+      showNotice('Could not save those details. Check the required fields and available storage.');
+      return;
+    }
+
+    editor.close?.();
+    refreshLibrary();
+    const updatedTrack = findTrack(getState().library, trackId);
+    const route = parseRoute();
+    if (route.name === 'album' && updatedTrack?.albumId && route.id !== updatedTrack.albumId) {
+      navigate(`/albums/${encodeURIComponent(updatedTrack.albumId)}`);
+    }
+    showNotice('Track details saved on this device.');
   });
 
   document.addEventListener('keydown', (event) => {

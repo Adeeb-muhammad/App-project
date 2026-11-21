@@ -118,7 +118,7 @@ export function filterSongs(songs, query) {
   const term = normalise(query);
   if (!term) return songs;
   return songs.filter((song) =>
-    [song.title, song.artist, song.albumTitle].some((value) =>
+    [song.title, song.artist, song.albumTitle, song.genre, song.language, ...(song.tags ?? [])].some((value) =>
       String(value ?? '').toLowerCase().includes(term),
     ),
   );

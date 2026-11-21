@@ -23,6 +23,9 @@ export function songRow(track, { number = null, showArtwork = true, playlistId =
       <span class="song-row__text">
         <span class="song-row__title">${title}</span>
         <span class="song-row__meta">${artist} · ${album}</span>
+      ${track.genre || track.language || track.tags?.length
+        ? `<span class="song-row__meta song-row__meta--details">${escapeHtml([track.genre, track.language, ...(track.tags ?? [])].filter(Boolean).join(' · '))}</span>`
+        : ''}
       </span>
       <span class="song-row__duration">${formatTime(track.duration)}</span>
       <span class="song-row__play" aria-hidden="true">${icon('play', { size: 15 })}</span>
@@ -32,6 +35,8 @@ ${showUtilities ? `<div class="song-row__utilities">
         data-action="toggle-favourite" data-track-id="${escapeHtml(track.id)}"
         aria-label="${favourite ? 'Remove from' : 'Add to'} Liked Songs" aria-pressed="${favourite}"
         title="${favourite ? 'Remove from Liked Songs' : 'Add to Liked Songs'}">${favourite ? '♥' : '♡'}</button>
+      <button class="song-row__utility" type="button" data-action="edit-track-metadata"
+        data-track-id="${escapeHtml(track.id)}" aria-label="Edit details for ${title}" title="Edit track details">✎</button>
       <button class="song-row__utility" type="button" data-action="play-next"
         data-track-id="${escapeHtml(track.id)}" aria-label="Play ${title} next" title="Play next">${icon('playNext', { size: 16 })}</button>
       <button class="song-row__utility" type="button" data-action="add-to-playlist"
