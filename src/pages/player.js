@@ -19,7 +19,18 @@ function queueRows(player) {
   return player.queue
     .map((track, index) => {
       const current = index === player.index;
-      return `<li>
+      const upcoming = index > player.index;
+      const controls = upcoming
+        ? `<div class="queue-row__actions">
+            <button class="queue-row__action" type="button" data-action="queue-move" data-track-id="${escapeHtml(track.id)}" data-direction="-1"
+              aria-label="Move ${escapeHtml(track.title)} up" title="Move up"${index === player.index + 1 ? ' disabled' : ''}>${icon('chevronUp', { size: 15 })}</button>
+            <button class="queue-row__action" type="button" data-action="queue-move" data-track-id="${escapeHtml(track.id)}" data-direction="1"
+              aria-label="Move ${escapeHtml(track.title)} down" title="Move down"${index === player.queue.length - 1 ? ' disabled' : ''}>${icon('chevronDown', { size: 15 })}</button>
+            <button class="queue-row__action queue-row__action--remove" type="button" data-action="remove-queue-track" data-track-id="${escapeHtml(track.id)}"
+              aria-label="Remove ${escapeHtml(track.title)} from queue" title="Remove from queue">${icon('close', { size: 15 })}</button>
+          </div>`
+        : '';
+      return `<li class="queue-entry">
         <button class="queue-row${current ? ' queue-row--current' : ''}" type="button" data-action="play-track" data-track-id="${escapeHtml(track.id)}"${current ? ' aria-current="true"' : ''}>
           <span class="queue-row__index" aria-hidden="true">${current ? icon('play', { size: 13 }) : String(index + 1).padStart(2, '0')}</span>
           <span class="queue-row__text">
@@ -28,6 +39,7 @@ function queueRows(player) {
           </span>
           <span class="queue-row__duration">${formatTime(track.duration)}</span>
         </button>
+        ${controls}
       </li>`;
     })
     .join('');
@@ -54,7 +66,11 @@ function queueDialog(player) {
         ${icon('close', { size: 18 })}
       </button>
     </div>
-    <p class="queue-sheet__meta">${pluralise(player.queue.length, 'track')} in this queue</p>
+    <div class="queue-sheet__summary">
+      <p class="queue-sheet__meta" data-role="queue-count">${pluralise(player.queue.length, 'track')} in this queue · ${pluralise(Math.max(0, player.queue.length - player.index - 1), 'up next')}</p>
+      <button class="button button--ghost button--small" type="button" data-action="clear-upcoming"
+        data-role="clear-upcoming"${player.queue.length > player.index + 1 ? '' : ' hidden'}>Clear upcoming</button>
+    </div>
     <ul class="queue-list" data-queue="player-queue">${queueRows(player)}</ul>
   </dialog>`;
 }
@@ -196,6 +212,18 @@ function updateProgress(root, player, { preserveScrubber = false } = {}) {
   if (duration) duration.textContent = formatTime(player.duration);
 }
 
+function updateQueueView(root, player) {
+  const list = root.querySelector('[data-queue="player-queue"]');
+  if (!list) return;
+  list.innerHTML = queueRows(player);
+  const count = root.querySelector('[data-role="queue-count"]');
+  if (count) {
+    count.textContent = `${pluralise(player.queue.length, 'track')} in this queue · ${pluralise(Math.max(0, player.queue.length - player.index - 1), 'up next')}`;
+  }
+  const clear = root.querySelector('[data-role="clear-upcoming"]');
+  if (clear) clear.hidden = player.queue.length <= player.index + 1;
+}
+
 function updateTransport(root, player) {
   const button = root.querySelector('[data-role="transport-toggle"]');
   if (!button) return;
@@ -317,6 +345,10 @@ export const playerPage = {
     scrubber?.addEventListener('blur', commitScrub, { signal });
 
     const unsubscribe = subscribePlayer(({ type, state: playerState }) => {
+      if (type === 'queue') {
+        updateQueueView(root, playerState);
+        return;
+      }
       if (type === 'progress') {
         updateProgress(root, playerState, { preserveScrubber: isScrubbing });
         return;
