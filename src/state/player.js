@@ -23,7 +23,6 @@ let engine = 'simulation';
 let bridge = null;
 let bridgeUnsubscribe = null;
 let bridgeEventsUnsubscribe = null;
-let notificationPermissionAsked = false;
 
 let state = {
   track: null,
@@ -150,30 +149,15 @@ function invoke(method, args = []) {
   }
 }
 
-/**
- * Android 13+ hides the media notification and lock-screen controls until the
- * user allows notifications. Ask once, on first native playback, and never let
- * the answer affect audio.
- */
-function askForNotificationPermission() {
-  if (notificationPermissionAsked) return;
-  if (!bridge || typeof bridge.requestNotificationPermission !== 'function') return;
-  notificationPermissionAsked = true;
-  Promise.resolve(bridge.requestNotificationPermission()).catch(() => {});
-}
-
-/** Errors and warnings pushed by the native service. */
+/** Errors pushed by the native service. */
 function handleNativeEvent(event) {
   if (engine !== 'native' || !event) return;
-  if (event.type === 'error') {
-    // ExoPlayer is the source of truth: it stopped, so the UI must stop too.
-    if (state.track) state.isPlaying = false;
-    stopTimer();
-    emit('state');
-    notify(event.message || 'Playback stopped unexpectedly. Try the track again.');
-    return;
-  }
-  if (event.type === 'warning' && event.message) notify(event.message);
+  if (event.type !== 'error') return;
+  // ExoPlayer is the source of truth: it stopped, so the UI must stop too.
+  if (state.track) state.isPlaying = false;
+  stopTimer();
+  emit('state');
+  notify(event.message || 'Playback stopped unexpectedly. Try the track again.');
 }
 
 function handleNativeState(native) {
@@ -285,7 +269,6 @@ export function playTrack(tracks, trackId, { autoplay = true } = {}) {
     state.isPlaying = autoplay;
     stopTimer();
     emit('track');
-    if (autoplay) askForNotificationPermission();
     invoke('setQueue', [list, index, autoplay]).then((accepted) => {
       if (!accepted && state.track?.id === startedTrackId) {
         state.isPlaying = false;

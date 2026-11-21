@@ -78,15 +78,6 @@ export function createNativeBridge() {
       return CinematicAudio.getState();
     },
 
-    /** Android 13+ notification/lock-screen permission; never fatal. */
-    async requestNotificationPermission() {
-      try {
-        return await CinematicAudio.requestNotificationPermission();
-      } catch {
-        return { granted: false };
-      }
-    },
-
     subscribe(listener) {
       let active = true;
       const handle = CinematicAudio.addListener('playbackState', (event) => {
@@ -101,29 +92,21 @@ export function createNativeBridge() {
     },
 
     /**
-     * Failures and warnings from the native service. `playbackError` means
-     * ExoPlayer really stopped; `playbackWarning` is advisory (for example the
-     * media notification cannot be shown because notifications are disabled).
+     * Failures pushed by the native service. `playbackError` means ExoPlayer
+     * really stopped; there is no advisory channel, because nothing the app can
+     * observe without a device (a hidden media notification, for instance) is
+     * worth interrupting the listener with.
      */
     subscribeEvents(listener) {
       let active = true;
-      const handles = [];
-      const register = (eventName, type) => {
-        handles.push(
-          CinematicAudio.addListener(eventName, (event) => {
-            if (active) listener({ ...event, type });
-          }),
-        );
-      };
-      register('playbackError', 'error');
-      register('playbackWarning', 'warning');
+      const handle = CinematicAudio.addListener('playbackError', (event) => {
+        if (active) listener({ ...event, type: 'error' });
+      });
       return () => {
         active = false;
-        for (const handle of handles) {
-          Promise.resolve(handle)
-            .then((registration) => registration.remove())
-            .catch(() => {});
-        }
+        Promise.resolve(handle)
+          .then((registration) => registration.remove())
+          .catch(() => {});
       };
     },
   };

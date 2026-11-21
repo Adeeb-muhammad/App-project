@@ -19,18 +19,15 @@ import androidx.media3.session.MediaSessionService
  * audio alive when the WebView is backgrounded or the screen is off.
  *
  * The Capacitor plugin never creates a player: it controls this service through
- * a MediaController so there is exactly one playback engine.
+ * a MediaController so there is exactly one playback engine, and the queue lives
+ * here rather than in the WebView. `adb logcat -s CinematicPlayback` shows every
+ * transition that decides whether playback is allowed to continue.
  */
 class PlaybackService : MediaSessionService() {
 
     private var player: ExoPlayer? = null
     private var mediaSession: MediaSession? = null
 
-    /**
-     * Logs the transitions that decide whether the service is allowed to stay in
-     * the foreground. `adb logcat -s CinematicPlayback` is then enough to see
-     * when Android actually started decoding and when it stopped.
-     */
     private val playerListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
             // Reported to the WebView by the plugin as well. Logging it here
@@ -48,6 +45,18 @@ class PlaybackService : MediaSessionService() {
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             Log.i(TAG, "playbackState=$playbackState")
+        }
+
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            // This is where a silent stop shows up. ExoPlayer clears
+            // playWhenReady on a permanent audio-focus loss and on an
+            // audio-becoming-noisy broadcast; both look identical to the user
+            // ("the music just stopped") and neither is a playback error, so
+            // the reason is logged explicitly.
+            Log.i(
+                TAG,
+                "playWhenReady=$playWhenReady reason=${reasonName(reason)} isPlaying=${player?.isPlaying}",
+            )
         }
     }
 
@@ -77,24 +86,17 @@ class PlaybackService : MediaSessionService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
 
     /**
-     * Dismissing the task must not silence ongoing playback, but it must not
-     * leave a silent paused service running forever either. Media3 only keeps
-     * the service alive while playback is genuinely ongoing.
+     * Media3 already implements the documented policy here: keep the service
+     * when playback is genuinely ongoing (foreground service plus a playing
+     * session), otherwise pause and stop it so the system does not restart a
+     * dead service. The app previously re-implemented that decision in this
+     * method and then called `stopSelf()` on its own narrower verdict, which
+     * could tear the service down while Media3 still considered playback
+     * ongoing — audio then stopped with no error at all. Delegating removes that
+     * second source of truth.
      */
     override fun onTaskRemoved(rootIntent: Intent?) {
-        val current = player
-        val playbackOngoing = current != null &&
-            current.mediaItemCount > 0 &&
-            current.playWhenReady &&
-            current.playbackState != Player.STATE_IDLE &&
-            current.playbackState != Player.STATE_ENDED
-        if (playbackOngoing) {
-            Log.i(TAG, "task removed while playing, keeping playback")
-        } else {
-            Log.i(TAG, "task removed while idle, stopping service")
-            current?.pause()
-            stopSelf()
-        }
+        Log.i(TAG, "task removed; handing the keep-or-stop decision to Media3")
         super.onTaskRemoved(rootIntent)
     }
 
@@ -120,6 +122,15 @@ class PlaybackService : MediaSessionService() {
             intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
+    }
+
+    private fun reasonName(reason: Int): String = when (reason) {
+        Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST -> "USER_REQUEST"
+        Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS -> "AUDIO_FOCUS_LOSS"
+        Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY -> "AUDIO_BECOMING_NOISY"
+        Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM -> "END_OF_MEDIA_ITEM"
+        Player.PLAY_WHEN_READY_CHANGE_REASON_REMOTE -> "REMOTE"
+        else -> "OTHER_$reason"
     }
 
     private companion object {

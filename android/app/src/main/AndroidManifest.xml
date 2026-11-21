@@ -31,7 +31,8 @@
         <service
             android:name=".PlaybackService"
             android:exported="true"
-            android:foregroundServiceType="mediaPlayback">
+            android:foregroundServiceType="mediaPlayback"
+            android:stopWithTask="false">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
             </intent-filter>
@@ -42,6 +43,9 @@
          Framework grants access to the exact documents the user picks. See docs/SECURITY.md. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- The media notification is posted by Media3. The app never prompts for this
+         permission: a denial hides the notification but does not affect playback, so
+         asking (or warning about it) would be noise. Users can enable it in settings. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Media3's datasource manifest adds network-state access for streaming. This app

@@ -1,12 +1,9 @@
 package com.personal.cinematicmusic
 
-import android.Manifest
 import android.app.Activity
 import android.content.ComponentName
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -25,8 +22,6 @@ import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.ActivityCallback
 import com.getcapacitor.annotation.CapacitorPlugin
-import com.getcapacitor.annotation.Permission
-import com.getcapacitor.annotation.PermissionCallback
 import com.google.common.util.concurrent.ListenableFuture
 import java.util.concurrent.Executors
 
@@ -40,17 +35,14 @@ import java.util.concurrent.Executors
  * The plugin owns exactly one [MediaController] connection. Every call waits for
  * (or reuses) that same connection instead of opening a new one, so overlapping
  * JS calls cannot create duplicate controllers or talk to a released player.
- * Native playback failures are forwarded to JS as `playbackError` events.
+ *
+ * The media notification is posted by Media3 inside [PlaybackService]. The app
+ * never asks for POST_NOTIFICATIONS at runtime: a denied permission only hides
+ * the notification, it does not affect playback, so prompting (or warning about
+ * it) would be noise. Users who want the notice can enable it in system
+ * settings.
  */
-@CapacitorPlugin(
-    name = "CinematicAudio",
-    permissions = [
-        Permission(
-            strings = [Manifest.permission.POST_NOTIFICATIONS],
-            alias = CinematicAudioPlugin.NOTIFICATION_ALIAS,
-        ),
-    ],
-)
+@CapacitorPlugin(name = "CinematicAudio")
 class CinematicAudioPlugin : Plugin() {
 
     private var controller: MediaController? = null
@@ -62,13 +54,25 @@ class CinematicAudioPlugin : Plugin() {
     private var pendingController: ListenableFuture<MediaController>? = null
 
     private var destroyed = false
-    private var notificationPermissionRequested = false
+
+    /**
+     * The last queue handed to the service. Android may destroy and recreate
+     * [PlaybackService] (low memory, task removal, an OEM killing the process'
+     * service); the recreated player is empty, so without this the transport
+     * buttons would silently do nothing. The queue is re-applied as soon as a
+     * fresh controller connects.
+     */
+    private var lastItems: List<MediaItem> = emptyList()
+    private var lastIndex = 0
+    private var lastPositionMs = 0L
+    private var lastWasPlaying = false
 
     private val handler = Handler(Looper.getMainLooper())
     private val metadataExecutor = Executors.newSingleThreadExecutor()
 
     private val playerListener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
+            rememberPosition(player)
             emitPlaybackState(player)
             updateTicker(player.isPlaying)
         }
@@ -79,7 +83,7 @@ class CinematicAudioPlugin : Plugin() {
 
         override fun onPlayerError(error: PlaybackException) {
             // Without this the WebView kept showing "playing" after ExoPlayer had
-            // already stopped, which is the freeze users see on the device.
+            // already stopped.
             Log.e(
                 PlaybackErrors.TAG,
                 "playback error ${error.errorCodeName} (${error.errorCode})",
@@ -101,6 +105,7 @@ class CinematicAudioPlugin : Plugin() {
         override fun run() {
             val player = controller ?: return
             if (!player.isPlaying) return
+            rememberPosition(player)
             emitPlaybackState(player)
             handler.postDelayed(this, POSITION_TICK_MS)
         }
@@ -214,12 +219,13 @@ class CinematicAudioPlugin : Plugin() {
             return
         }
 
+        val safeIndex = PlaybackPolicy.startIndex(startIndex, items.size)
+        lastItems = items
+        lastIndex = safeIndex
+        lastPositionMs = 0L
+
         withController(call) { mediaController ->
-            mediaController.setMediaItems(
-                items,
-                PlaybackPolicy.startIndex(startIndex, items.size),
-                0L,
-            )
+            mediaController.setMediaItems(items, safeIndex, 0L)
             mediaController.prepare()
             if (autoplay) mediaController.play() else mediaController.pause()
             emitPlaybackState(mediaController)
@@ -248,6 +254,10 @@ class CinematicAudioPlugin : Plugin() {
 
     @PluginMethod
     fun stop(call: PluginCall) {
+        lastItems = emptyList()
+        lastIndex = 0
+        lastPositionMs = 0L
+        lastWasPlaying = false
         val mediaController = controller
         if (mediaController == null) {
             call.resolve()
@@ -263,8 +273,9 @@ class CinematicAudioPlugin : Plugin() {
     @PluginMethod
     fun seekTo(call: PluginCall) {
         val positionMs = call.getLong("positionMs") ?: 0L
+        lastPositionMs = positionMs.coerceAtLeast(0L)
         withController(call) { mediaController ->
-            mediaController.seekTo(positionMs.coerceAtLeast(0L))
+            mediaController.seekTo(lastPositionMs)
             call.resolve()
         }
     }
@@ -319,6 +330,7 @@ class CinematicAudioPlugin : Plugin() {
     private fun withController(call: PluginCall, block: (MediaController) -> Unit) {
         controller?.let { existing ->
             if (existing.isConnected) {
+                restoreQueueIfNeeded(existing)
                 block(existing)
                 return
             }
@@ -360,7 +372,9 @@ class CinematicAudioPlugin : Plugin() {
                         // player that commands are already going to.
                         mediaController.release()
                     }
-                    block(controller ?: mediaController)
+                    val connected = controller ?: mediaController
+                    restoreQueueIfNeeded(connected)
+                    block(connected)
                 } catch (error: Exception) {
                     if (pendingController === future) pendingController = null
                     Log.e(PlaybackErrors.TAG, "could not connect to the playback service", error)
@@ -369,6 +383,37 @@ class CinematicAudioPlugin : Plugin() {
             },
             ContextCompat.getMainExecutor(context),
         )
+    }
+
+    /**
+     * Pushes the remembered queue back into a player that has none.
+     *
+     * A recreated [PlaybackService] starts with an empty `ExoPlayer`, so after a
+     * reconnect every transport command would be a no-op and the UI would look
+     * like it was playing while nothing happened. Restoring the queue — and the
+     * position the user was at — keeps playback controllable across a service
+     * restart.
+     */
+    private fun restoreQueueIfNeeded(mediaController: MediaController) {
+        if (lastItems.isEmpty()) return
+        if (mediaController.mediaItemCount > 0) return
+        if (mediaController.playbackState != Player.STATE_IDLE) return
+
+        Log.i(
+            PlaybackErrors.TAG,
+            "restoring ${lastItems.size} queued item(s) after a service reconnect",
+        )
+        mediaController.setMediaItems(lastItems, lastIndex, lastPositionMs)
+        mediaController.prepare()
+        if (lastWasPlaying) mediaController.play()
+    }
+
+    private fun rememberPosition(player: Player) {
+        if (lastItems.isEmpty()) return
+        if (player.mediaItemCount == 0) return
+        lastIndex = player.currentMediaItemIndex
+        lastPositionMs = player.currentPosition.coerceAtLeast(0L)
+        lastWasPlaying = player.playWhenReady
     }
 
     private fun updateTicker(playing: Boolean) {
@@ -421,63 +466,6 @@ class CinematicAudioPlugin : Plugin() {
         else -> "unknown"
     }
 
-    // ---------------------------------------------------------- notifications
-
-    /**
-     * Android 13+ hides the media notification (and with it the lock-screen and
-     * notification controls) until POST_NOTIFICATIONS is granted. JS asks for it
-     * once, on its own call, so a prompt or a denial can never fail playback or
-     * resolve the playback call twice.
-     */
-    @PluginMethod
-    fun requestNotificationPermission(call: PluginCall) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            call.resolve(permissionPayload(true))
-            return
-        }
-        if (notificationPermissionGranted()) {
-            call.resolve(permissionPayload(true))
-            return
-        }
-        if (notificationPermissionRequested || bridge?.activity == null) {
-            call.resolve(permissionPayload(false))
-            return
-        }
-        notificationPermissionRequested = true
-        try {
-            requestPermissionForAlias(NOTIFICATION_ALIAS, call, "notificationPermissionResult")
-        } catch (error: Exception) {
-            notificationPermissionRequested = false
-            Log.w(PlaybackErrors.TAG, "could not request notification permission", error)
-            call.resolve(permissionPayload(false))
-        }
-    }
-
-    @PermissionCallback
-    private fun notificationPermissionResult(call: PluginCall) {
-        notificationPermissionRequested = false
-        val granted = notificationPermissionGranted()
-        if (!granted) {
-            Log.w(PlaybackErrors.TAG, "notification permission denied; media controls stay hidden")
-            notifyListeners(
-                "playbackWarning",
-                JSObject().put(
-                    "message",
-                    "Notifications are off for Cinematic, so playback continues without media " +
-                        "controls in the notification shade or on the lock screen.",
-                ),
-            )
-        }
-        call.resolve(permissionPayload(granted))
-    }
-
-    private fun permissionPayload(granted: Boolean): JSObject =
-        JSObject().put("granted", granted)
-
-    private fun notificationPermissionGranted(): Boolean =
-        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
-
     // --------------------------------------------------------------- helpers
 
     private fun canRead(uri: Uri): Boolean = try {
@@ -500,8 +488,6 @@ class CinematicAudioPlugin : Plugin() {
     }
 
     companion object {
-        const val NOTIFICATION_ALIAS = "notifications"
-
         private const val POSITION_TICK_MS = 500L
         private const val PREVIOUS_RESTART_MS = 3_000L
         private const val UNAVAILABLE_MESSAGE = "Playback service is unavailable"

@@ -211,20 +211,15 @@ test('a rejected setQueue does not leave the UI pretending to play', async () =>
   assert.equal(player.getPlayerState().track.id, 't1');
 });
 
-test('a native warning is shown without stopping playback', () => {
+test('starting native playback asks for nothing else', () => {
   const bridge = fakeBridge();
   player.configurePlayback({ mode: 'native', bridge });
-  const notices = [];
-  const unsubscribe = player.subscribe(({ type, message }) => {
-    if (type === 'notice') notices.push(message);
-  });
-
   player.playTrack(tracks, 't1');
-  bridge.emitEvent({ type: 'warning', message: 'Media controls are hidden.' });
 
-  assert.equal(player.getPlayerState().isPlaying, true);
-  assert.deepEqual(notices, ['Media controls are hidden.']);
-  unsubscribe();
+  // No permission prompt and no extra round trip: the only native call that
+  // starting playback makes is the queue itself.
+  assert.deepEqual(bridge.calls.map(([name]) => name), ['setQueue']);
+  assert.equal(typeof bridge.requestNotificationPermission, 'undefined');
 });
 
 test('native playWhenReady and buffering snapshots are applied', () => {
