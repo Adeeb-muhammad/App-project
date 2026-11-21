@@ -16,6 +16,15 @@ const DEFAULT_PALETTE = ['#A78BFA', '#7C6BFF', '#191B25'];
 const MAX_TEXT = 300;
 const MAX_TRACKS = 500;
 
+// yt-dlp's output template appends this ID to the stored download filename.
+// Keep the physical file untouched, but hide that implementation detail from
+// the library's title and display filename.
+const YOUTUBE_ID_SUFFIX = /\s+\[[A-Za-z0-9_-]{11}\](?=(?:\.[a-z0-9]{1,8})?$)/i;
+
+function stripYoutubeIdSuffix(value) {
+  return String(value ?? '').replace(YOUTUBE_ID_SUFFIX, '').trimEnd();
+}
+
 function storage() {
   try {
     return globalThis.localStorage ?? null;
@@ -55,8 +64,13 @@ export function normaliseImportedTrack(input) {
   const uri = typeof input.uri === 'string' ? input.uri.trim() : '';
   if (!/^content:\/\//i.test(uri)) return null;
 
-  const fileName = cleanText(input.fileName, null);
-  const title = cleanText(input.title, cleanText(fileStem(fileName), 'Untitled track'));
+  const sourceFileName = cleanText(input.fileName, null);
+  const hasYoutubeIdSuffix = sourceFileName !== null && YOUTUBE_ID_SUFFIX.test(sourceFileName);
+  const fileName = hasYoutubeIdSuffix
+    ? stripYoutubeIdSuffix(sourceFileName)
+    : sourceFileName;
+  const sourceTitle = cleanText(input.title, cleanText(fileStem(sourceFileName), 'Untitled track'));
+  const title = hasYoutubeIdSuffix ? stripYoutubeIdSuffix(sourceTitle) : sourceTitle;
   const artist = cleanText(input.artist, 'Unknown artist');
   const album = cleanText(input.album, 'Imported audio');
 
