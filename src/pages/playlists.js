@@ -7,7 +7,7 @@ import { createPlaylist, deletePlaylist } from '../data/personal-library.js';
 import { emptyState } from '../components/empty-state.js';
 import { icon } from '../components/icon.js';
 
-function playlistCard(playlist) {
+function playlistCard(playlist, editable = true) {
   const style = glowStyle(playlist.palette);
   return `<li class="playlist-card-item">
     <div class="playlist-card-wrap">
@@ -23,7 +23,7 @@ function playlistCard(playlist) {
         </span>
         <span class="playlist-card__chevron" aria-hidden="true">${icon('chevronRight', { size: 18 })}</span>
       </a>
-      ${playlist.isSystem ? '' : `<button class="playlist-card__delete" type="button" data-action="delete-playlist" data-playlist-id="${escapeHtml(playlist.id)}" aria-label="Delete playlist ${escapeHtml(playlist.name)}">Delete</button>`}
+      ${!editable || playlist.isSystem ? '' : `<button class="playlist-card__delete" type="button" data-action="delete-playlist" data-playlist-id="${escapeHtml(playlist.id)}" aria-label="Delete playlist ${escapeHtml(playlist.name)}">Delete</button>`}
     </div>
   </li>`;
 }
@@ -39,7 +39,7 @@ export const playlistsPage = {
         <p class="screen-head__sub">Build your own collections and keep them on this device.</p>
       </header>
 
-      <form class="playlist-create" data-role="create-playlist-form">
+      ${state.demo ? '<p class="playlist-readonly">Demo preview is read-only. Create playlists in your real library.</p>' : `<form class="playlist-create" data-role="create-playlist-form">`
         <label class="sr-only" for="new-playlist-name">Playlist name</label>
         <input id="new-playlist-name" name="name" class="search__input" maxlength="40" required
           placeholder="Name your playlist" autocomplete="off" />
@@ -47,10 +47,10 @@ export const playlistsPage = {
         <input id="new-playlist-description" name="description" class="search__input"
           maxlength="180" placeholder="Description (optional)" autocomplete="off" />
         <button class="button button--primary button--small" type="submit">Create playlist</button>
-      </form>
+      </form>`}
 
       ${playlists.length
-        ? `<ul class="playlist-list">${playlists.map(playlistCard).join('')}</ul>`
+        ? `<ul class="playlist-list">${playlists.map((playlist) => playlistCard(playlist, !state.demo)).join('')}</ul>`
         : `<div class="intro-panel">${emptyState({
             iconName: 'playlists',
             title: 'No playlists yet',
