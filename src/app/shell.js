@@ -21,6 +21,8 @@ import {
   next,
   playTrack,
   previous,
+  setShuffleEnabled,
+  cycleRepeatMode,
   subscribe as subscribePlayer,
   toggle,
 } from '../state/player.js';
@@ -195,6 +197,14 @@ export function mountShell(root) {
     if (action === 'toggle-play') {
       event.preventDefault();
       toggle();
+      return;
+    }
+    if (action === 'toggle-shuffle') {
+      setShuffleEnabled(!getPlayerState().shuffleEnabled);
+      return;
+    }
+    if (action === 'cycle-repeat') {
+      cycleRepeatMode();
       return;
     }
     if (action === 'next') {

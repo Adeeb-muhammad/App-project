@@ -67,6 +67,8 @@ class CinematicAudioPlugin : Plugin() {
     private var lastIndex = 0
     private var lastPositionMs = 0L
     private var lastWasPlaying = false
+    private var lastShuffleEnabled = false
+    private var lastRepeatMode = Player.REPEAT_MODE_OFF
 
     private val handler = Handler(Looper.getMainLooper())
     private val metadataExecutor = Executors.newSingleThreadExecutor()
@@ -229,6 +231,8 @@ class CinematicAudioPlugin : Plugin() {
             lastPositionMs = 0L
             lastWasPlaying = autoplay
             mediaController.setMediaItems(items, safeIndex, 0L)
+            mediaController.shuffleModeEnabled = lastShuffleEnabled
+            mediaController.repeatMode = lastRepeatMode
             mediaController.prepare()
             if (autoplay) mediaController.play() else mediaController.pause()
             emitPlaybackState(mediaController)
@@ -310,6 +314,35 @@ class CinematicAudioPlugin : Plugin() {
             } else {
                 mediaController.seekTo(0L)
             }
+            call.resolve()
+        }
+    }
+
+    @PluginMethod
+    fun setShuffleEnabled(call: PluginCall) {
+        val enabled = call.getBoolean("enabled") ?: false
+        withController(call) { mediaController ->
+            lastShuffleEnabled = enabled
+            mediaController.shuffleModeEnabled = enabled
+            call.resolve()
+        }
+    }
+
+    @PluginMethod
+    fun setRepeatMode(call: PluginCall) {
+        val mode = call.getString("mode") ?: "off"
+        val repeatMode = when (mode) {
+            "off" -> Player.REPEAT_MODE_OFF
+            "track" -> Player.REPEAT_MODE_ONE
+            "queue" -> Player.REPEAT_MODE_ALL
+            else -> {
+                call.reject("Unsupported repeat mode")
+                return
+            }
+        }
+        withController(call) { mediaController ->
+            lastRepeatMode = repeatMode
+            mediaController.repeatMode = repeatMode
             call.resolve()
         }
     }
@@ -452,6 +485,8 @@ class CinematicAudioPlugin : Plugin() {
             "restoring ${lastItems.size} queued item(s) after a service reconnect",
         )
         mediaController.setMediaItems(lastItems, lastIndex, lastPositionMs)
+        mediaController.shuffleModeEnabled = lastShuffleEnabled
+        mediaController.repeatMode = lastRepeatMode
         mediaController.prepare()
         if (lastWasPlaying) mediaController.play()
     }

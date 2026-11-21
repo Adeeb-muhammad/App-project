@@ -86,7 +86,21 @@ await page.locator('[data-action="previous"]').click();
 check('previous returns to first track', (await title()) === firstTitle);
 await alive('next/previous');
 
-// 8 seek
+// 8 shuffle and repeat controls
+const shuffle = page.locator('[data-role="shuffle-toggle"]');
+await shuffle.click();
+check('shuffle can be enabled', await shuffle.getAttribute('aria-pressed') === 'true');
+await shuffle.click();
+check('shuffle can be disabled', await shuffle.getAttribute('aria-pressed') === 'false');
+const repeat = page.locator('[data-role="repeat-toggle"]');
+await repeat.click();
+check('repeat-one mode is available', await repeat.getAttribute('aria-label') === 'Repeat track');
+await repeat.click();
+check('repeat-queue mode is available', await repeat.getAttribute('aria-label') === 'Repeat queue');
+await repeat.click();
+check('repeat can be turned off', await repeat.getAttribute('aria-label') === 'Repeat off');
+
+// 9 seek
 const scrubber = page.locator('[data-role="scrubber"]');
 await scrubber.evaluate((el) => {
   el.value = '700';

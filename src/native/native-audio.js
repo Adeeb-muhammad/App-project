@@ -74,6 +74,14 @@ export function createNativeBridge() {
       await CinematicAudio.previous();
     },
 
+    async setShuffleEnabled(enabled) {
+      await CinematicAudio.setShuffleEnabled({ enabled: Boolean(enabled) });
+    },
+
+    async setRepeatMode(mode) {
+      await CinematicAudio.setRepeatMode({ mode: String(mode) });
+    },
+
     async getState() {
       return CinematicAudio.getState();
     },

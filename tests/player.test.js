@@ -41,6 +41,29 @@ test('a throwing listener does not block others', () => {
   player.clear();
 });
 
+test('shuffle and repeat preferences are exposed in player state', () => {
+  player.configurePlayback({ mode: 'simulation' });
+  player.playTrack(tracks, 't1');
+
+  assert.equal(player.getPlayerState().shuffleEnabled, false);
+  assert.equal(player.getPlayerState().repeatMode, 'off');
+
+  player.setShuffleEnabled(true);
+  assert.equal(player.getPlayerState().shuffleEnabled, true);
+  assert.equal(player.cycleRepeatMode(), 'track');
+  assert.equal(player.getPlayerState().repeatMode, 'track');
+  assert.equal(player.cycleRepeatMode(), 'queue');
+  assert.equal(player.getPlayerState().repeatMode, 'queue');
+  assert.equal(player.cycleRepeatMode(), 'off');
+  assert.equal(player.getPlayerState().repeatMode, 'off');
+
+  player.clear();
+  assert.equal(player.getPlayerState().shuffleEnabled, true);
+  assert.equal(player.getPlayerState().repeatMode, 'off');
+  player.setShuffleEnabled(false);
+  player.clear();
+});
+
 test('seekRatio clamps and toggle pauses/resumes', () => {
   player.selectTrack(tracks, 't1');
   player.seekRatio(5);
