@@ -51,6 +51,59 @@ const playerState = async () => ({
 });
 const rendersDuring = async (fn) => { const before = await page.evaluate(() => window.__renders); await fn(); await page.waitForTimeout(150); return (await page.evaluate(() => window.__renders)) - before; };
 
+// Local metadata editor: seed an app-private imported record and edit its overlay.
+await goto(BASE);
+const metadataTrackUri = 'content://media/external/audio/media/4242';
+await page.evaluate((uri) => {
+  localStorage.setItem('cinematic.imported.v1', JSON.stringify([{
+    uri,
+    fileName: 'raw-file-name.mp3',
+    title: 'Original Title',
+    artist: 'Original Artist',
+    album: 'Original Album',
+    duration: 185,
+    addedAt: 1800000000000,
+    mimeType: 'audio/mpeg',
+  }]));
+}, metadataTrackUri);
+await goto(`${BASE}#/library/songs`);
+await page.locator('[data-action="edit-track-metadata"]').click();
+const editor = page.locator('[data-role="track-editor"]');
+check('metadata editor opens for an imported track', await editor.evaluate((d) => d.open));
+await editor.locator('[name="title"]').fill('Edited Title');
+await editor.locator('[name="artist"]').fill('Edited Artist');
+await editor.locator('[name="albumTitle"]').fill('Edited Album');
+await editor.locator('[name="genre"]').fill('Ambient');
+await editor.locator('[name="language"]').fill('English');
+await editor.locator('[name="tags"]').fill('dreamy, late night, dreamy');
+await editor.locator('[name="notes"]').fill('My private listening note.');
+await editor.locator('button[type="submit"]').click();
+await page.waitForFunction(() => document.querySelector('.song-row__title')?.textContent === 'Edited Title');
+check('saved title and artist are shown in the library',
+  (await page.locator('.song-row__title').textContent()) === 'Edited Title'
+  && (await page.locator('.song-row__meta').first().textContent()).includes('Edited Artist'));
+check('genre and tags appear in track details', (await page.locator('.song-row__meta--details').textContent()).includes('Ambient'));
+check('metadata search finds genre values', await page.locator('[data-role="library-search"]').count() === 1);
+await page.locator('[data-role="library-search"]').fill('Ambient');
+check('genre is searchable', await page.locator('.song-row__title').count() === 1);
+await page.locator('[data-role="library-search"]').fill('');
+await page.locator('[data-action="edit-track-metadata"]').click();
+check('private note is restored in the editor',
+  (await editor.locator('[name="notes"]').inputValue()) === 'My private listening note.');
+const untouchedImport = await page.evaluate((uri) => {
+  const rows = JSON.parse(localStorage.getItem('cinematic.imported.v1') || '[]');
+  return rows.find((row) => row.uri === uri);
+}, metadataTrackUri);
+check('editing did not rewrite the original imported record',
+  untouchedImport?.title === 'Original Title' && untouchedImport?.album === 'Original Album');
+const savedOverlay = await page.evaluate((uri) => JSON.parse(localStorage.getItem('cinematic.track-metadata.v1') || '{}')[uri], metadataTrackUri);
+check('tags are deduplicated in local metadata', savedOverlay?.tags?.join('|') === 'dreamy|late night');
+await editor.locator('[data-action="close-track-editor"]').click();
+await page.evaluate(() => {
+  localStorage.removeItem('cinematic.imported.v1');
+  localStorage.removeItem('cinematic.track-metadata.v1');
+});
+
 // 1-3: demo mode, album, start playback
 await goto(`${BASE}?demo=1#/library/albums`);
 
