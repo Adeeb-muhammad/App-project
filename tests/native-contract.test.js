@@ -79,6 +79,7 @@ test('only media playback permissions are requested, never storage access', () =
   assert.deepEqual(permissions, [
     'android.permission.FOREGROUND_SERVICE',
     'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK',
+    'android.permission.INTERNET',
     'android.permission.POST_NOTIFICATIONS',
     'android.permission.WAKE_LOCK',
   ]);
@@ -162,6 +163,37 @@ test('the JS player rolls back optimistic state on native failures', () => {
   assert.match(js, /function handleNativeEvent/);
   assert.match(js, /subscribeEvents/);
   assert.match(js, /if \(!accepted\)/);
+});
+
+test('YouTube downloads become ordinary local tracks', () => {
+  const downloadPlugin = read(
+    'android/app/src/main/java/com/personal/cinematicmusic/YouTubeAudioPlugin.kt',
+  );
+  const urlPolicy = read(
+    'android/app/src/main/java/com/personal/cinematicmusic/YouTubeUrlPolicy.kt',
+  );
+  const js = read('src/native/youtube-audio.js');
+
+  assert.match(mainActivity, /registerPlugin\(YouTubeAudioPlugin\.class\)/);
+  assert.match(js, /registerPlugin\('YouTubeAudio'\)/);
+  assert.match(downloadPlugin, /@CapacitorPlugin\(name = "YouTubeAudio"\)/);
+  assert.match(downloadPlugin, /@PluginMethod\s+fun download\(call: PluginCall\)/);
+  // Audio only, converted to MP3 with the bundled FFmpeg.
+  assert.match(downloadPlugin, /addOption\("-x"\)/);
+  assert.match(downloadPlugin, /addOption\("--audio-format", "mp3"\)/);
+  assert.match(downloadPlugin, /YoutubeDL\.getInstance\(\)\.init\(/);
+  assert.match(downloadPlugin, /FFmpeg\.getInstance\(\)\.init\(/);
+  // The result must reach the player as a content:// URI, never a file path.
+  assert.match(downloadPlugin, /FileProvider\.getUriForFile/);
+  assert.match(downloadPlugin, /AudioMetadataReader\.read\(/);
+  assert.ok(!/setUri\("file:\/\//.test(downloadPlugin));
+  // Links are gated by a pure policy the unit tests cover.
+  assert.match(urlPolicy, /youtu\.be/);
+  assert.match(urlPolicy, /endsWith\("\.youtube\.com"\)/);
+  assert.match(variables, /youtubedlAndroidVersion = '\d+\.\d+\.\d+'/);
+  assert.match(gradle, /youtubedl-android:library:\$youtubedlAndroidVersion/);
+  assert.match(gradle, /youtubedl-android:ffmpeg:\$youtubedlAndroidVersion/);
+  assert.match(manifest, /android\.permission\.INTERNET/);
 });
 
 test('Media3 version is pinned in one place', () => {

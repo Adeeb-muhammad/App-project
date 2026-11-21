@@ -1,13 +1,21 @@
 import { escapeHtml } from '../utils/dom.js';
 import { href } from '../utils/navigation.js';
 import { pluralise } from '../utils/format.js';
-import { setUi } from '../state/store.js';
+import { refreshLibrary, setUi } from '../state/store.js';
+import { addImportedTrack } from '../data/imported.js';
 import { filterAlbums, filterArtists, filterSongs } from '../data/library.js';
 import { albumCard } from '../components/album-card.js';
 import { emptyState } from '../components/empty-state.js';
 import { icon } from '../components/icon.js';
 import { songRow } from '../components/song-row.js';
 import { isAndroidNative } from '../native/native-audio.js';
+import { downloadYouTubeAudio, isDownloadSupported } from '../native/youtube-audio.js';
+
+/**
+ * The download message lives outside the render so it survives the re-render
+ * that adding a track triggers.
+ */
+let downloadStatus = '';
 
 const TABS = [
   { id: 'songs', label: 'Songs' },
@@ -51,6 +59,21 @@ function artistList(artists) {
       )
       .join('')}
   </ul>`;
+}
+
+function downloadBar(status) {
+  return `<div class="import-bar">
+    <div class="import-bar__text">
+      <p class="import-bar__title">Save YouTube audio as MP3</p>
+      <p class="import-bar__hint">Paste a video link and the audio track is saved into this app, then plays offline like any imported file. Only save content you have the rights to.</p>
+    </div>
+    <form class="download-form" data-role="youtube-form" novalidate>
+      <label class="sr-only" for="youtube-url">YouTube video link</label>
+      <input id="youtube-url" class="search__input" type="url" inputmode="url" data-role="youtube-url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" spellcheck="false" />
+      <button class="button button--primary button--small" type="submit" data-role="youtube-submit">Save MP3</button>
+    </form>
+    <p class="download-status" data-role="download-status" role="status" aria-live="polite"${status ? '' : ' hidden'}>${escapeHtml(status)}</p>
+  </div>`;
 }
 
 function emptyCopy(tab, searching) {
@@ -151,6 +174,8 @@ export const libraryPage = {
         </button>
       </div>`}
 
+      ${state.demo || !isDownloadSupported() ? '' : downloadBar(downloadStatus)}
+
       ${tabs(tab)}
 
       ${
@@ -172,19 +197,83 @@ export const libraryPage = {
   },
 
   mount(root, { state, route }) {
+    const cleanups = [];
+
     const input = root.querySelector('[data-role="library-search"]');
     const results = root.querySelector('[data-role="library-results"]');
     const announcement = root.querySelector('[data-role="result-count"]');
-    if (!input || !results) return undefined;
+    if (input && results) {
+      const tab = route?.tab ?? 'songs';
+      const onInput = () => {
+        setUi({ search: input.value }, { notify: false });
+        results.innerHTML = resultsHtml(state.library, tab, input.value);
+        if (announcement) announcement.textContent = resultAnnouncement(state.library, tab, input.value);
+      };
+      input.addEventListener('input', onInput);
+      cleanups.push(() => input.removeEventListener('input', onInput));
+    }
 
-    const tab = route?.tab ?? 'songs';
-    const onInput = () => {
-      setUi({ search: input.value }, { notify: false });
-      results.innerHTML = resultsHtml(state.library, tab, input.value);
-      if (announcement) announcement.textContent = resultAnnouncement(state.library, tab, input.value);
-    };
+    const form = root.querySelector('[data-role="youtube-form"]');
+    if (form) {
+      const field = root.querySelector('[data-role="youtube-url"]');
+      const submit = root.querySelector('[data-role="youtube-submit"]');
+      const status = root.querySelector('[data-role="download-status"]');
 
-    input.addEventListener('input', onInput);
-    return () => input.removeEventListener('input', onInput);
+      const setStatus = (text) => {
+        downloadStatus = text;
+        if (!status) return;
+        status.textContent = text;
+        status.hidden = !text;
+      };
+
+      const setBusy = (busy) => {
+        if (!submit) return;
+        if (busy) submit.dataset.busy = 'true';
+        else delete submit.dataset.busy;
+        submit.toggleAttribute('aria-busy', busy);
+        submit.disabled = busy;
+      };
+
+      const onSubmit = async (event) => {
+        event.preventDefault();
+        if (submit?.dataset.busy === 'true') return;
+
+        const url = field?.value?.trim() ?? '';
+        if (!url) {
+          setStatus('Paste a YouTube video link first.');
+          field?.focus();
+          return;
+        }
+
+        setBusy(true);
+        setStatus('Starting the download…');
+        const result = await downloadYouTubeAudio(url, {
+          onProgress: ({ percent, line }) => {
+            if (percent > 0) setStatus(`Downloading… ${percent}%`);
+            else if (line) setStatus(line);
+          },
+        });
+        setBusy(false);
+
+        if (!result.ok) {
+          setStatus(result.message);
+          return;
+        }
+
+        const added = addImportedTrack(result.track);
+        if (!added.track) {
+          setStatus('That download could not be added to the library.');
+          return;
+        }
+        if (field) field.value = '';
+        setStatus(`Saved “${added.track.title}” to your library.`);
+        refreshLibrary();
+      };
+
+      form.addEventListener('submit', onSubmit);
+      cleanups.push(() => form.removeEventListener('submit', onSubmit));
+    }
+
+    return cleanups.length > 0 ? () => cleanups.forEach((fn) => fn()) : undefined;
   },
 };

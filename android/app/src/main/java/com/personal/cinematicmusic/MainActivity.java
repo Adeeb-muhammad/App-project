@@ -9,6 +9,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         // Local Capacitor plugins are registered before the bridge starts.
         registerPlugin(CinematicAudioPlugin.class);
+        registerPlugin(YouTubeAudioPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

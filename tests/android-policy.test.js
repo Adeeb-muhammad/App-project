@@ -45,6 +45,7 @@ test('source manifest requests media permissions only, no storage access and no 
   assert.deepEqual(permissions, [
     'android.permission.FOREGROUND_SERVICE',
     'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK',
+    'android.permission.INTERNET',
     'android.permission.POST_NOTIFICATIONS',
     'android.permission.WAKE_LOCK',
   ]);
@@ -58,7 +59,20 @@ test('source manifest requests media permissions only, no storage access and no 
   }
   assert.match(manifest, /android:name="\.PlaybackService"/);
   assert.match(manifest, /android:foregroundServiceType="mediaPlayback"/);
-  assert.ok(!/FileProvider/.test(manifest));
+});
+
+test('the only FileProvider exposes one app-private download folder', () => {
+  const providers = [...manifest.matchAll(/<provider[\s\S]*?<\/provider>/g)].map((match) => match[0]);
+  assert.equal(providers.length, 1, 'exactly one provider should exist');
+  const provider = providers[0];
+  assert.match(provider, /androidx\.core\.content\.FileProvider/);
+  assert.match(provider, /android:authorities="\$\{applicationId\}\.downloads"/);
+  assert.match(provider, /android:exported="false"/);
+  assert.match(provider, /@xml\/download_paths/);
+
+  const paths = read('res/xml/download_paths.xml');
+  assert.ok(!/external-path|external-files-path|root-path/.test(paths), 'never expose external storage');
+  assert.match(paths, /<files-path[^>]*path="downloads\/"/);
   assert.ok(!existsSync(new URL('../android/app/src/main/res/xml/file_paths.xml', import.meta.url)));
 });
 

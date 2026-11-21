@@ -4,6 +4,7 @@
 
     <application
         android:allowBackup="false"
+        android:extractNativeLibs="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -37,6 +38,19 @@
                 <action android:name="androidx.media3.session.MediaSessionService" />
             </intent-filter>
         </service>
+
+        <!-- Serves downloaded MP3s from app-private storage as content:// URIs so the
+             library and the player keep treating every track the same way. Scoped to
+             one folder by res/xml/download_paths.xml; not exported. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.downloads"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/download_paths" />
+        </provider>
     </application>
 
     <!-- Media playback only. No storage permission is requested: the Storage Access
@@ -48,6 +62,9 @@
          asking (or warning about it) would be noise. Users can enable it in settings. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Only the optional "save a YouTube link as MP3" feature uses the network; the
+         rest of the app stays local and works offline. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- Media3's datasource manifest adds network-state access for streaming. This app
          plays only local documents, so remove the merged permission and stay fully offline. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
