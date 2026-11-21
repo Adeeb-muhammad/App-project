@@ -146,6 +146,20 @@ ${state.demo ? '' : `        <div class="track-rating" role="group" aria-label="
         </div>
       </div>
 
+      <div class="now-playing__modes" aria-label="Playback modes">
+        <button class="transport-mode${player.shuffleEnabled ? ' is-active' : ''}" type="button"
+          data-action="toggle-shuffle" data-role="shuffle-toggle" aria-label="Shuffle ${player.shuffleEnabled ? 'on' : 'off'}"
+          aria-pressed="${player.shuffleEnabled}" title="Shuffle">
+          ${icon('shuffle', { size: 19 })}
+        </button>
+        <button class="transport-mode${player.repeatMode !== 'off' ? ' is-active' : ''}" type="button"
+          data-action="cycle-repeat" data-role="repeat-toggle" aria-label="Repeat ${player.repeatMode}"
+          aria-pressed="${player.repeatMode !== 'off'}" title="Repeat ${player.repeatMode}">
+          ${icon('repeat', { size: 19 })}
+          <span class="transport-mode__badge" data-role="repeat-indicator">${player.repeatMode === 'track' ? '1' : player.repeatMode === 'queue' ? 'all' : ''}</span>
+        </button>
+      </div>
+
       <div class="now-playing__controls">
         <button class="transport-button" type="button" data-action="previous" aria-label="Previous track">
           ${icon('previous', { size: 24 })}
@@ -187,6 +201,25 @@ function updateTransport(root, player) {
   if (!button) return;
   button.innerHTML = icon(player.isPlaying ? 'pause' : 'play', { size: 30 });
   button.setAttribute('aria-label', player.isPlaying ? 'Pause' : 'Play');
+
+  const shuffle = root.querySelector('[data-role="shuffle-toggle"]');
+  if (shuffle) {
+    shuffle.classList.toggle('is-active', player.shuffleEnabled);
+    shuffle.setAttribute('aria-pressed', String(player.shuffleEnabled));
+    shuffle.setAttribute('aria-label', `Shuffle ${player.shuffleEnabled ? 'on' : 'off'}`);
+  }
+
+  const repeat = root.querySelector('[data-role="repeat-toggle"]');
+  if (repeat) {
+    const repeatLabel = player.repeatMode === 'track' ? 'track' : player.repeatMode === 'queue' ? 'queue' : 'off';
+    repeat.classList.toggle('is-active', player.repeatMode !== 'off');
+    repeat.setAttribute('aria-pressed', String(player.repeatMode !== 'off'));
+    repeat.setAttribute('aria-label', `Repeat ${repeatLabel}`);
+    repeat.title = `Repeat ${repeatLabel}`;
+  }
+  const repeatIndicator = root.querySelector('[data-role="repeat-indicator"]');
+  if (repeatIndicator) repeatIndicator.textContent = player.repeatMode === 'track' ? '1' : player.repeatMode === 'queue' ? 'all' : '';
+
   const note = root.querySelector('[data-role="engine-note"] span');
   if (note) note.textContent = engineNote(player);
   const section = root.querySelector('.now-playing');
