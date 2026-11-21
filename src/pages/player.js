@@ -3,6 +3,7 @@ import { artStyle } from '../utils/safe.js';
 import { formatTime, pluralise } from '../utils/format.js';
 import { findAlbum } from '../data/library.js';
 import { getPlayerState, seekRatio, subscribe as subscribePlayer } from '../state/player.js';
+import { getTrackRating } from '../data/personal-library.js';
 import { artwork } from '../components/artwork.js';
 import { emptyState } from '../components/empty-state.js';
 import { icon } from '../components/icon.js';
@@ -112,6 +113,17 @@ function playerView(state, player) {
         <p class="now-playing__album">${escapeHtml(album ? `${album.title} · ${album.year}` : track.albumTitle)}</p>
         <h1 class="now-playing__title" id="player-title" tabindex="-1">${escapeHtml(track.title)}</h1>
         <p class="now-playing__artist">${escapeHtml(track.artist)}</p>
+        <div class="track-rating" role="group" aria-label="Rate this track">
+          <span class="track-rating__label">Your rating</span>
+          <span class="track-rating__stars">
+            ${[1, 2, 3, 4, 5].map((rating) => {
+              const selected = rating <= getTrackRating(track.id);
+              return `<button class="track-rating__star${selected ? ' is-selected' : ''}" type="button"
+                data-action="rate-track" data-track-id="${escapeHtml(track.id)}" data-rating="${rating}"
+                aria-label="Rate ${rating} out of 5" aria-pressed="${selected}">${selected ? '★' : '☆'}</button>`;
+            }).join('')}
+          </span>
+        </div>
       </div>
 
       <div class="now-playing__scrub">
