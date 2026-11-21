@@ -162,7 +162,7 @@ tests = {
         ("elapsedMs < 1_500", "elapsedMs < 3_500", "cast accept-loop timing allowance"),
     ],
     "app/src/test/java/com/dd3boh/outertune/constants/ReleasedFlagsTest.kt": [
-        ('"Casting\\'s words could not all be found", 23, names.size)', '"Casting\\'s words could not all be found", 26, names.size)', "cast resource count"),
+        (""" "Casting's words could not all be found", 23, names.size)""".strip(), """ "Casting's words could not all be found", 26, names.size)""".strip(), "cast resource count"),
     ],
     "app/src/test/java/com/dd3boh/outertune/ui/screens/settings/ExplanationsStayShortTest.kt": [
         ('            "usage_count_enabled_description",\n', "", "short usage-count setting description is not a long-form exception"),
