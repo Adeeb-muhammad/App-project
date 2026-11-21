@@ -11,10 +11,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "android:debug": "python3 scripts/prepare-intertune.py && cd android && ./gradlew :app:assembleCoreDebug",
+    "android:debug": "python3 scripts/prepare-intertune.py && cd android && ./gradlew :app:assembleFullDebug",
     "test": "node --test \"tests/**/*.test.js\"",
     "verify": "npm test && npm run build",
-    "android:test": "python3 scripts/prepare-intertune.py && cd android && ./gradlew :app:testCoreDebugUnitTest"
+    "android:test": "python3 scripts/prepare-intertune.py && cd android && ./gradlew :app:testFullDebugUnitTest"
   },
   "dependencies": {
     "@capacitor/android": "^8.6.0",
