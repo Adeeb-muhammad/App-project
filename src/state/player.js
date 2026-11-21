@@ -31,6 +31,8 @@ let state = {
   isPlaying: false,
   position: 0,
   duration: 0,
+  shuffleEnabled: false,
+  repeatMode: 'off',
 };
 
 let timer = null;
@@ -43,6 +45,8 @@ function snapshot() {
     isPlaying: state.isPlaying,
     position: state.position,
     duration: state.duration,
+    shuffleEnabled: state.shuffleEnabled,
+    repeatMode: state.repeatMode,
     engine,
   };
 }
@@ -102,27 +106,50 @@ function setIndex(index, { autoplay = true } = {}) {
 function step(direction, { automatic = false } = {}) {
   if (state.queue.length === 0) return;
 
+  // Repeat-one only changes automatic end-of-track behaviour. A manual
+  // Next/Previous press still moves through the queue.
+  if (automatic && state.repeatMode === 'track') {
+    state.position = 0;
+    emit('progress');
+    return;
+  }
+
   if (direction < 0 && state.position > 3) {
     state.position = 0;
     emit('progress');
     return;
   }
 
-  const nextIndex = state.index + direction;
+  let nextIndex;
+  if (direction > 0 && state.shuffleEnabled && state.queue.length > 1) {
+    const candidates = state.queue.map((_, index) => index).filter((index) => index !== state.index);
+    nextIndex = candidates[Math.floor(Math.random() * candidates.length)];
+  } else {
+    nextIndex = state.index + direction;
+  }
+
   if (nextIndex < 0) {
-    state.position = 0;
-    emit('progress');
-    return;
-  }
-  if (nextIndex >= state.queue.length) {
-    if (automatic) {
-      state.isPlaying = false;
-      state.position = state.duration;
-      stopTimer();
-      emit('state');
+    if (state.repeatMode === 'queue') nextIndex = state.queue.length - 1;
+    else {
+      state.position = 0;
+      emit('progress');
+      return;
     }
-    return;
   }
+
+  if (nextIndex >= state.queue.length) {
+    if (state.repeatMode === 'queue') nextIndex = 0;
+    else {
+      if (automatic) {
+        state.isPlaying = false;
+        state.position = state.duration;
+        stopTimer();
+        emit('state');
+      }
+      return;
+    }
+  }
+
   setIndex(nextIndex, { autoplay: true });
 }
 
@@ -334,6 +361,28 @@ export function previous() {
   step(-1);
 }
 
+/** Enables/disables queue shuffling in the active playback engine. */
+export function setShuffleEnabled(enabled) {
+  const nextValue = Boolean(enabled);
+  if (state.shuffleEnabled === nextValue) return;
+  state.shuffleEnabled = nextValue;
+  if (engine === 'native') invoke('setShuffleEnabled', [nextValue]);
+  emit('state');
+}
+
+/** Cycles repeat behaviour: off → current track → whole queue → off. */
+export function cycleRepeatMode() {
+  const nextMode = {
+    off: 'track',
+    track: 'queue',
+    queue: 'off',
+  }[state.repeatMode] ?? 'off';
+  state.repeatMode = nextMode;
+  if (engine === 'native') invoke('setRepeatMode', [nextMode]);
+  emit('state');
+  return nextMode;
+}
+
 export function seekRatio(ratio) {
   if (!state.track) return;
   const clamped = Math.min(Math.max(Number(ratio) || 0, 0), 1);
@@ -352,6 +401,9 @@ export function clear() {
     isPlaying: false,
     position: 0,
     duration: 0,
+    // Playback preferences survive stopping the current queue.
+    shuffleEnabled: state.shuffleEnabled,
+    repeatMode: state.repeatMode,
   };
   emit('track');
 }
