@@ -20,7 +20,7 @@ For an existing checkout:
 git submodule update --init --recursive
 ```
 
-## Prepare and build
+## Build the fully featured Android variant
 
 Use the repository-level scripts. They apply the checked-in, commit-pinned compatibility patch before running Gradle:
 
@@ -29,11 +29,11 @@ npm run android:test
 npm run android:debug
 ```
 
-Requirements: Python 3, JDK 21 and Android SDK 36.
+Requirements: Python 3, JDK 21, Android SDK 36, CMake 3.31.6 and NDK 29.0.13113456. The Full variant also requires the prebuilt FFmpeg libraries in `android/ffMetadataEx/ffmpeg-android-maker`; CI resolves them from the upstream `audio` branch of `ffmpeg-android-maker-prebuilt`.
 
-The patch is in `scripts/prepare-intertune.py`. It refuses to run against any InterTune commit other than the pinned one, makes the minimal resource/test corrections required by the current source, and is safe to run repeatedly. GitHub Actions uses the same script, so local and CI builds use the same preparation.
+The patch is in `scripts/prepare-intertune.py`. It refuses to run against any InterTune commit other than the pinned one, makes the minimal resource/test corrections required by the current source, and is safe to run repeatedly. GitHub Actions uses the same script.
 
-The debug APK is produced under `android/app/build/outputs/apk/core/debug/`.
+The Full debug APK is produced under `android/app/build/outputs/apk/full/debug/`. This is the fully featured flavor; do not substitute `coreDebug`, which deliberately omits the bundled FFmpeg scanner and decoder implementation.
 
 ## App identity and data
 
