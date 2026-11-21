@@ -87,7 +87,19 @@ check('previous returns to first track', (await title()) === firstTitle);
 await alive('next/previous');
 
 // 8 seek
-await page.locator('[data-role="scrubber"]').evaluate((el) => { el.value = '500'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+const scrubber = page.locator('[data-role="scrubber"]');
+await scrubber.evaluate((el) => {
+  el.value = '700';
+  el.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+});
+await page.waitForTimeout(350);
+check('progress ticks do not pull the thumb away during scrubbing', await scrubber.inputValue() === '700');
+await scrubber.evaluate((el) => {
+  el.value = '500';
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+});
 const elapsed = await page.locator('[data-role="elapsed"]').textContent();
 const dur = await page.locator('[data-role="duration"]').textContent();
 const toSec = (t) => t.split(':').reduce((a, b) => a * 60 + Number(b), 0);
