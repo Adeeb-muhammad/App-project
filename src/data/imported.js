@@ -9,6 +9,7 @@
  */
 
 import { buildPersonalCollections, getTrackRating, isFavourite } from './personal-library.js';
+import { applyTrackMetadata, loadTrackMetadata } from './track-metadata.js';
 
 const STORAGE_KEY = 'cinematic.imported.v1';
 const DEFAULT_PALETTE = ['#A78BFA', '#7C6BFF', '#191B25'];
@@ -150,7 +151,9 @@ function artistId(name) {
 
 /** Builds the same view model shape the demo library provides. */
 export function buildImportedLibrary(input = []) {
-  const tracks = dedupe((Array.isArray(input) ? input : []).map(normaliseImportedTrack).filter(Boolean));
+  const metadata = loadTrackMetadata();
+  const tracks = dedupe((Array.isArray(input) ? input : []).map(normaliseImportedTrack).filter(Boolean))
+    .map((track) => applyTrackMetadata(track, metadata));
 
   const songs = tracks.map((track, index) => ({
     ...track,
