@@ -50,6 +50,14 @@ export function parseRoute(hash = window.location.hash) {
     }
     case 'now-playing':
       return { name: 'player', path, segments };
+    case 'discover':
+      return { name: 'discover', path, segments };
+    case 'watch': {
+      const kind = second;
+      const id = segments[2] ? decodeParam(segments[2]) : null;
+      if (kind !== 'video' || id === null || !/^[A-Za-z0-9_-]{11}$/.test(id)) return { name: 'notFound', path, segments };
+      return { name: 'youtubePlayer', mediaType: 'video', id, path, segments };
+    }
     case 'settings':
       return { name: 'settings', path, segments };
     default:
