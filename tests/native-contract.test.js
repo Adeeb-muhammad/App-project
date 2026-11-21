@@ -41,6 +41,8 @@ test('every method the JS bridge calls exists on the Kotlin plugin', () => {
     'seekTo',
     'next',
     'previous',
+    'setShuffleEnabled',
+    'setRepeatMode',
     'getState',
   ];
   for (const method of methods) {
@@ -152,10 +154,12 @@ test('task removal defers to the Media3 policy instead of a second opinion', () 
   assert.match(serviceCode, /PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY/);
 });
 
-test('a reconnected service gets its queue back', () => {
+test('a reconnected service gets its queue and playback modes back', () => {
   assert.match(plugin, /private var lastItems: List<MediaItem>/);
   assert.match(plugin, /restoreQueueIfNeeded\(/);
   assert.match(plugin, /mediaController\.setMediaItems\(lastItems, lastIndex, lastPositionMs\)/);
+  assert.match(plugin, /mediaController\.shuffleModeEnabled = lastShuffleEnabled/);
+  assert.match(plugin, /mediaController\.repeatMode = lastRepeatMode/);
   assert.match(plugin, /if \(lastWasPlaying\) mediaController\.play\(\)/);
 });
 
