@@ -15,7 +15,7 @@ This document tracks the Joytify capabilities being adapted into Cinematic Music
 | Joytify capability | Cinematic Music status | Port approach |
 | --- | --- | --- |
 | Native audio player and progress | Existing | Keep Media3 and current scrubber fix |
-| Queue display and track selection | Existing | Add queue editing, remove/reorder, play-next and clear |
+| Queue display and track selection | Implemented in this PR | Play next, move/remove upcoming items and clear upcoming without interrupting the current track |
 | Shuffle | Implemented in PR #11 | Map to Media3 shuffle mode and simulation behavior |
 | Repeat off / current track / queue | Implemented in PR #11 | Map to Media3 repeat modes |
 | Playlist create, edit, delete and assign tracks | Existing local feature | Extend with sort/arrangement options |
@@ -47,7 +47,7 @@ This document tracks the Joytify capabilities being adapted into Cinematic Music
 - Preserve the existing queue, local import path, background playback and scrubber behavior.
 
 ### Batch 2 — Queue and library management (in progress)
-- Queue editing: play next, move upcoming tracks, remove upcoming tracks and clear upcoming tracks while keeping the active track playing.
+- Queue editing implemented in this PR: play next, move upcoming tracks, remove upcoming tracks and clear upcoming tracks while keeping the active track playing.
 - Search all local songs/albums/artists with useful filtering and sorting.
 - Edit imported metadata and add tags, genres, language, lyrics and private notes.
 
@@ -65,4 +65,4 @@ This document tracks the Joytify capabilities being adapted into Cinematic Music
 
 ## Current implementation note
 
-The first playback-controls pull request is implementing shuffle and repeat through the existing CinematicAudio Capacitor plugin and Media3 MediaController. The PR is not considered complete until GitHub Actions passes and the app is exercised on an Android device.
+PR #11 merged the shuffle/repeat controls after web, browser E2E and Android CI passed. This queue-management PR keeps Android Media3 as the playback engine and preserves the current track position when the queue is edited. Physical-device verification is still required for native queue editing.
