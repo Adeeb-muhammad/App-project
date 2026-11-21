@@ -23,6 +23,8 @@ const ICONS = {
     '<path d="M4 7h10M4 12h10M4 17h6"/><path d="M16.4 12.6v5.6l4.4-2.8z" fill="currentColor" stroke-linejoin="round"/>',
   shuffle: '<path d="m3 7 2 0c4.7 0 7.3 10 12 10h4"/><path d="m18 14 3 3-3 3"/><path d="M3 17h2c2.1 0 3.7-2.1 5.3-4.4"/><path d="M14 7c1-1 2-2 3-2h4"/><path d="m18 2 3 3-3 3"/>',
   repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="m7 22-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>',
+  playNext: '<path d="M5 5.5v13l10-6.5z" fill="currentColor"/><path d="M19 5v14M21.5 12h-5"/>',
+  chevronUp: '<path d="m6 15 6-6 6 6"/>',
   close: '<path d="m6 6 12 12M18 6 6 18"/>',
   chevronDown: '<path d="m6 9 6 6 6-6"/>',
   chevronRight: '<path d="m9 6 6 6-6 6"/>',
