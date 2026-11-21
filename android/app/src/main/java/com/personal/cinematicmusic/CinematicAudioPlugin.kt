@@ -389,21 +389,30 @@ class CinematicAudioPlugin : Plugin() {
                     call.reject(UNAVAILABLE_MESSAGE)
                     return@addListener
                 }
+                var uncommittedController: MediaController? = null
                 try {
                     val mediaController = future.get()
                     if (pendingController === future) pendingController = null
                     val current = controller
-                    if (current == null) {
-                        controller = mediaController
+                    val connected = if (current == null) {
+                        // Do not publish the shared controller until this first
+                        // caller's initial operation has completed successfully.
                         mediaController.addListener(playerListener)
-                    } else if (current !== mediaController) {
-                        mediaController.release()
+                        uncommittedController = mediaController
+                        mediaController
+                    } else {
+                        if (current !== mediaController) mediaController.release()
+                        current
                     }
 
-                    val connected = controller ?: mediaController
                     if (restoreQueue) restoreQueueIfNeeded(connected)
                     block(connected)
+                    if (current == null) {
+                        controller = mediaController
+                        uncommittedController = null
+                    }
                 } catch (error: Exception) {
+                    uncommittedController?.removeListener(playerListener)
                     if (pendingController === future) pendingController = null
                     Log.e(PlaybackErrors.TAG, "could not connect to the playback service", error)
                     call.reject(
