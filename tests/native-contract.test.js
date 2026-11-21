@@ -22,6 +22,7 @@ const manifest = stripComments(read('android/app/src/main/AndroidManifest.xml'))
 const gradle = read('android/app/build.gradle');
 const rootGradle = read('android/build.gradle');
 const variables = read('android/variables.gradle');
+const workflow = read('.github/workflows/build.yml');
 
 test('the Capacitor plugin is named and registered', () => {
   assert.match(plugin, /@CapacitorPlugin\(\s*name = "CinematicAudio"\s*,?\s*\)/);
@@ -199,4 +200,31 @@ test('YouTube downloads become ordinary local tracks', () => {
 test('Media3 version is pinned in one place', () => {
   assert.match(variables, /media3Version = '1\.\d+\.\d+'/);
   assert.ok(!/media3Version = '1\.8\.0'/.test(gradle), 'no duplicate version literal');
+});
+
+test('MediaController is pinned to main and controller work is marshalled there', () => {
+  assert.ok(plugin.includes('private fun dispatchToControllerThread'));
+  assert.ok(plugin.includes('.setApplicationLooper(Looper.getMainLooper())'));
+  assert.ok(plugin.includes('private fun withController(') && plugin.includes('dispatchToControllerThread {'));
+  const connectionCallback = plugin.slice(plugin.indexOf('future.addListener'), plugin.indexOf('ContextCompat.getMainExecutor(context)', plugin.indexOf('future.addListener')));
+  assert.ok(connectionCallback.indexOf('block(connected)') < connectionCallback.indexOf('controller = mediaController'), 'do not cache a controller until its first command succeeds');
+  const stopBody = plugin.slice(plugin.indexOf('fun stop'), plugin.indexOf('fun seekTo'));
+  assert.ok(stopBody.includes('dispatchToControllerThread {'));
+  const getStateBody = plugin.slice(plugin.indexOf('fun getState'), plugin.indexOf('// ------------------------------------------------------------ connection'));
+  assert.ok(getStateBody.includes('withController(call, restoreQueue = false)'));
+  assert.ok(!getStateBody.includes('restoreQueue = true'));
+});
+
+test('Android APK inspection permits downloader INTERNET and checks the scoped provider', () => {
+  assert.ok(workflow.includes('android.permission.INTERNET'));
+  assert.ok(workflow.includes('androidx.core.content.FileProvider'));
+  assert.ok(workflow.includes('android.support.FILE_PROVIDER_PATHS'));
+  assert.ok(!workflow.includes('! echo "$TREE" | grep -q "FileProvider"'));
+});
+
+test('YouTube download admission is atomic under concurrent calls', () => {
+  const downloadPlugin = read('android/app/src/main/java/com/personal/cinematicmusic/YouTubeAudioPlugin.kt');
+  assert.ok(downloadPlugin.includes('AtomicBoolean'));
+  assert.ok(downloadPlugin.includes('compareAndSet(false, true)'));
+  assert.ok(downloadPlugin.includes('downloadInProgress.set(false)'));
 });
