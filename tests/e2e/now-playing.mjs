@@ -66,7 +66,7 @@ await page.evaluate((uri) => {
     mimeType: 'audio/mpeg',
   }]));
 }, metadataTrackUri);
-await goto(`${BASE}#/library/songs`);
+await goto(`${BASE}?metadata-fixture=1#/library/songs`);
 await page.locator('[data-action="edit-track-metadata"]').click();
 const editor = page.locator('[data-role="track-editor"]');
 check('metadata editor opens for an imported track', await editor.evaluate((d) => d.open));
