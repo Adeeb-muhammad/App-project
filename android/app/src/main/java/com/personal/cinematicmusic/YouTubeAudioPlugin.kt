@@ -60,16 +60,7 @@ class YouTubeAudioPlugin : Plugin() {
                 YoutubeDL.getInstance().init(appContext)
                 FFmpeg.getInstance().init(appContext)
 
-                // The APK-bundled yt-dlp can age out. Check the official stable
-                // release before each user-started download; the updater only
-                // downloads a replacement when GitHub reports a new release tag.
-                // The replacement is kept in app-private noBackupFilesDir storage.
-                val updateStatus = YoutubeDL.getInstance().updateYoutubeDL(
-                    appContext,
-                    YoutubeDL.UpdateChannel.STABLE
-                )
-                val activeYtDlpVersion = YoutubeDL.versionName(appContext) ?: "bundled"
-                Log.i(TAG, "yt-dlp update status=$updateStatus, active version=$activeYtDlpVersion")
+                refreshYtDlpIfDue(appContext)
 
                 val request = YoutubeDLRequest(url).apply {
                     addOption("--no-mtime")
@@ -118,6 +109,29 @@ class YouTubeAudioPlugin : Plugin() {
         }
     }
 
+    /**
+     * Check the official stable release at most once every 24 hours. The
+     * updater itself downloads a replacement only when a new release exists.
+     * Persist only a successful check, so transient network errors can retry.
+     */
+    private fun refreshYtDlpIfDue(appContext: Context) {
+        val preferences = appContext.getSharedPreferences(UPDATE_PREFS, Context.MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        val lastCheck = preferences.getLong(LAST_UPDATE_CHECK_MS, 0L)
+        if (!YtDlpUpdatePolicy.isCheckDue(lastCheck, now)) {
+            Log.d(TAG, "Skipping yt-dlp update check; checked within the last 24 hours")
+            return
+        }
+
+        val updateStatus = YoutubeDL.getInstance().updateYoutubeDL(
+            appContext,
+            YoutubeDL.UpdateChannel.STABLE
+        )
+        val activeYtDlpVersion = YoutubeDL.versionName(appContext) ?: "bundled"
+        Log.i(TAG, "yt-dlp update status=$updateStatus, active version=$activeYtDlpVersion")
+        preferences.edit().putLong(LAST_UPDATE_CHECK_MS, now).apply()
+    }
+
     private fun emitProgress(progress: Float, etaSeconds: Long, line: String) {
         val payload = JSObject().apply {
             put("percent", progress.toInt())
@@ -159,6 +173,8 @@ class YouTubeAudioPlugin : Plugin() {
         const val DOWNLOAD_DIR = "downloads"
         const val PROCESS_ID = "cinematic-youtube-download"
         const val MAX_LINE = 200
+        const val UPDATE_PREFS = "youtube_audio_updates"
+        const val LAST_UPDATE_CHECK_MS = "last_successful_update_check_ms"
 
         /** Kept short and sanitised so a hostile title cannot escape the folder. */
         const val FILE_TEMPLATE = "%(title).150B [%(id)s]"

@@ -192,10 +192,15 @@ test('YouTube downloads become ordinary local tracks', () => {
   assert.match(downloadPlugin, /FFmpeg\.getInstance\(\)\.init\(/);
   assert.match(downloadPlugin, /YoutubeDL\.UpdateChannel\.STABLE/);
   assert.match(downloadPlugin, /YoutubeDL\.versionName\(appContext\)/);
-  const updaterCall = downloadPlugin.indexOf('YoutubeDL.getInstance().updateYoutubeDL(');
+  const updaterCall = downloadPlugin.indexOf('refreshYtDlpIfDue(appContext)');
   const executeCall = downloadPlugin.indexOf('YoutubeDL.getInstance().execute(');
   assert.ok(updaterCall >= 0 && executeCall > updaterCall,
-    'refresh the official stable yt-dlp before executing a download');
+    'run the throttled yt-dlp update policy before executing a download');
+  assert.match(downloadPlugin, /YtDlpUpdatePolicy\.isCheckDue/);
+  assert.match(downloadPlugin, /LAST_UPDATE_CHECK_MS/);
+  const updatePolicy = read('android/app/src/main/java/com/personal/cinematicmusic/YtDlpUpdatePolicy.kt');
+  assert.match(updatePolicy, /24L \* 60L \* 60L \* 1000L/);
+  assert.match(updatePolicy, /nowMs - lastSuccessfulCheckMs >= CHECK_INTERVAL_MS/);
   // The result must reach the player as a content:// URI, never a file path.
   assert.match(downloadPlugin, /FileProvider\.getUriForFile/);
   assert.match(downloadPlugin, /AudioMetadataReader\.read\(/);
