@@ -142,12 +142,6 @@ check('selecting queued track changes title', (await title()) === targetTitle, t
 check('queue selection renders at most 2 times', rQ <= 2, `renders=${rQ}`);
 check('queue highlights newly selected track', (await page.locator('.queue-row--current .queue-row__title').textContent()) === targetTitle);
 check('mini-player synced after queue select', (await playerState()).mini === targetTitle);
-const clearButton = page.locator('[data-action="clear-upcoming"]');
-if (await clearButton.isVisible()) {
-  await clearButton.click();
-  check('clear upcoming keeps the active track in the queue', await page.locator('.queue-row--current').count() === 1);
-  check('clear upcoming hides when nothing remains', await page.locator('[data-action="clear-upcoming"]').count() === 0);
-}
 await page.locator('[data-action="close-queue"]').click();
 check('queue closed', !(await page.locator('dialog[data-role="queue"]').evaluate((d) => d.open)));
 await alive('queue');
@@ -173,6 +167,19 @@ for (let i = 0; i < 15; i++) {
 const rCycle = await rendersDuring(() => page.locator('[data-action="next"]').click());
 check('after 15 open/close cycles next still renders once (no accumulated listeners)', rCycle === 1, `renders=${rCycle}`);
 check('only one simulated-clock interval active', (await page.evaluate(() => window.__intervals.size)) === 1, `intervals=${await page.evaluate(() => window.__intervals.size)}`);
+
+// Clear-upcoming is tested with a fresh four-track queue so the player has
+// multiple upcoming items even after the queue-editing cases above.
+await goto(`${BASE}?demo=1#/library/albums`);
+await page.locator('a.album-card').first().click();
+await page.locator('[data-action="play-album"]').click();
+await page.waitForSelector('.now-playing__title', { state: 'attached' });
+await page.locator('[data-action="open-queue"]').click();
+check('clear-upcoming control is available when tracks remain', await page.locator('[data-action="clear-upcoming"]').isVisible());
+await page.locator('[data-action="clear-upcoming"]').click();
+check('clear upcoming keeps the active track in the queue', await page.locator('.queue-row').count() === 1);
+check('clear upcoming becomes hidden when nothing remains', !(await page.locator('[data-action="clear-upcoming"]').isVisible()));
+await page.locator('[data-action="close-queue"]').click();
 
 // Escape, history, malformed URLs
 await page.keyboard.press('Escape');
