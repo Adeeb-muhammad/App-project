@@ -6,6 +6,7 @@ import './styles/library.css';
 import './styles/playlists.css';
 import './styles/player.css';
 import './styles/settings.css';
+import './styles/discover.css';
 
 import { isDemoMode } from './utils/demo-mode.js';
 import { initStore } from './state/store.js';
