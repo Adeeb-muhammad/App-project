@@ -4,6 +4,9 @@ import { formatTime, pluralise } from '../utils/format.js';
 import { findAlbum } from '../data/library.js';
 import { getPlayerState, seekRatio, subscribe as subscribePlayer } from '../state/player.js';
 import { getTrackRating } from '../data/personal-library.js';
+import { getTrackMetadata, saveTrackMetadata } from '../data/track-metadata.js';
+import { lookupLyrics } from '../data/lyrics-provider.js';
+import { refreshLibrary } from '../state/store.js';
 import { artwork } from '../components/artwork.js';
 import { emptyState } from '../components/empty-state.js';
 import { icon } from '../components/icon.js';
@@ -106,6 +109,7 @@ function playerView(state, player) {
   const album = findAlbum(state.library, track.albumId);
   const style = artStyle(track.palette);
   const percent = progressPercent(player);
+  const savedLyrics = track.lyrics?.trim() ? track.lyrics : getTrackMetadata(track.id)?.lyrics ?? '';
 
   return `<section class="now-playing${isPlaying ? ' is-playing' : ''}" style="${style}" aria-labelledby="player-title">
     <div class="now-playing__veil" aria-hidden="true"></div>
@@ -143,8 +147,12 @@ ${state.demo ? '' : `        <div class="track-rating" role="group" aria-label="
       </div>
 
       <section class="lyrics-panel" data-role="lyrics-panel" aria-labelledby="lyrics-title">
-        <h2 id="lyrics-title">Lyrics</h2>
-        ${track.lyrics?.trim() ? `<pre class="lyrics-panel__text">${escapeHtml(track.lyrics)}</pre>` : '<p class="lyrics-panel__empty">No lyrics added for this track yet. Add them in Edit track details.</p>'}
+        <div class="lyrics-panel__head">
+          <h2 id="lyrics-title">Lyrics</h2>
+          ${state.demo ? '' : '<button class="button button--ghost button--small" type="button" data-role="lyrics-search">Find lyrics online</button>'}
+        </div>
+        <p class="lyrics-panel__status" data-role="lyrics-status" role="status" aria-live="polite"${savedLyrics ? ' hidden' : ''}>${savedLyrics ? '' : 'No lyrics saved yet. Search online to find them.'}</p>
+        <pre class="lyrics-panel__text" data-role="lyrics-text"${savedLyrics ? '' : ' hidden'}>${escapeHtml(savedLyrics)}</pre>
       </section>
 
       <div class="now-playing__scrub">
@@ -259,6 +267,65 @@ function updateTransport(root, player) {
   if (section) section.classList.toggle('is-playing', player.isPlaying);
 }
 
+
+const automaticLyricsAttempts = new Set();
+
+async function runLyricsLookup(root, track, signal) {
+  const button = root.querySelector('[data-role="lyrics-search"]');
+  const status = root.querySelector('[data-role="lyrics-status"]');
+  const output = root.querySelector('[data-role="lyrics-text"]');
+  if (!status || !output || signal.aborted) return;
+
+  if (button) button.disabled = true;
+  status.hidden = false;
+  status.textContent = 'Searching online for lyrics…';
+
+  try {
+    const result = await lookupLyrics(track, { signal });
+    if (signal.aborted) return;
+
+    if (!result) {
+      status.textContent = 'No matching lyrics found. Check the track title and artist in Edit track details, then try again.';
+      return;
+    }
+    if (result.instrumental) {
+      status.textContent = 'This track is listed as instrumental, so no lyrics are available.';
+      return;
+    }
+    if (!result.lyrics) {
+      status.textContent = 'A matching track was found, but it has no lyrics available.';
+      return;
+    }
+
+    const existing = getTrackMetadata(track.id) ?? {};
+    const saved = saveTrackMetadata(track.id, {
+      title: existing.title || track.title,
+      artist: existing.artist || track.artist,
+      albumTitle: existing.albumTitle || track.albumTitle,
+      genre: existing.genre || track.genre || '',
+      language: existing.language || track.language || '',
+      tags: existing.tags || track.tags || [],
+      notes: existing.notes || track.notes || '',
+      lyrics: result.lyrics,
+    });
+
+    output.textContent = result.lyrics;
+    output.hidden = false;
+    status.textContent = saved
+      ? 'Lyrics found and saved on this device for offline use.'
+      : 'Lyrics found, but could not be saved locally. They may not remain available after leaving this screen.';
+
+    if (saved) refreshLibrary();
+  } catch (error) {
+    if (signal.aborted || error?.name === 'AbortError') return;
+    status.textContent = error?.retryAfter
+      ? 'Lyrics service is rate-limiting requests. Try again in ' + error.retryAfter + ' seconds.'
+      : 'Could not reach the lyrics service. Check your internet connection and try again.';
+  } finally {
+    if (!signal.aborted && button) button.disabled = false;
+  }
+}
+
 export const playerPage = {
   title: 'Now playing',
   render(state) {
@@ -271,6 +338,18 @@ export const playerPage = {
     const controller = new AbortController();
     const { signal } = controller;
     const dialog = root.querySelector('[data-role="queue"]');
+    const currentTrack = getPlayerState().track;
+    const lyricsButton = root.querySelector('[data-role="lyrics-search"]');
+    if (currentTrack && lyricsButton) {
+      lyricsButton.addEventListener('click', () => {
+        void runLyricsLookup(root, currentTrack, signal);
+      }, { signal });
+
+      if (!automaticLyricsAttempts.has(currentTrack.id)) {
+        automaticLyricsAttempts.add(currentTrack.id);
+        void runLyricsLookup(root, currentTrack, signal);
+      }
+    }
 
     root.querySelector('[data-action="open-queue"]')?.addEventListener(
       'click',

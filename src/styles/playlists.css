@@ -288,7 +288,11 @@
 
 /* ---------- Local lyrics panel ---------- */
 .lyrics-panel { width: 100%; margin: 18px 0; padding: 16px; border: 1px solid rgba(255,255,255,.09); border-radius: 18px; background: rgba(10,11,16,.24); }
-.lyrics-panel h2 { margin: 0 0 12px; font-size: 16px; }
+.lyrics-panel__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.lyrics-panel__head .button { flex: none; }
+.lyrics-panel h2 { margin: 0; font-size: 16px; }
+.lyrics-panel__status { margin: 0; color: var(--text-muted); font-size: 12px; line-height: 1.6; }
+.lyrics-panel__status[hidden], .lyrics-panel__text[hidden] { display: none; }
 .lyrics-panel__text { max-height: 320px; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 13px; line-height: 1.85; }
 .lyrics-panel__empty { color: var(--text-muted); font-size: 12px; line-height: 1.6; }
 
