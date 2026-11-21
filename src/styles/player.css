@@ -327,6 +327,10 @@
   font-size: 28px;
 }
 
+.queue-sheet [hidden] {
+  display: none;
+}
+
 .queue-sheet__summary {
   display: flex;
   align-items: center;
