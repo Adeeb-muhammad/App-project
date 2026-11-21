@@ -1,194 +1,56 @@
 # Cinematic Music
 
-An offline-first personal music player for Android with a cinematic, dark interface.
-The frontend is plain HTML5, CSS3 and vanilla JavaScript (ES modules) built with Vite,
-packaged for Android with Capacitor 8. Audio plays through AndroidX Media3 ExoPlayer in a
-`MediaSessionService`, so it continues in the background and responds to notification and
-lock-screen controls.
+The Android app is now based on [InterTune](https://github.com/ItzSkyeYT/InterTune), a complete native Android music player. The pinned upstream checkout is brought in as the `android/` Git submodule, including its own nested dependencies.
 
-**Current state: Milestone 2B — local playback and personal library collections.** The five planned
-screens plus album and playlist detail exist, and a file picked with Android’s document
-picker is imported, remembered and played for real. The browser build explains that native
-playback needs the Android app; the opt-in demo mode (`?demo=1`) still uses a clearly
-labelled simulation.
+**The Android app does not require you to create or paste a YouTube Data API key.** InterTune has its own YouTube Music search and playback implementation.
 
-Version: `0.1.0`
+## Get the full source
 
-## Requirements
-
-- Node.js **22.12+** (tested on Node 26.13.0) and npm.
-- For Android builds: **JDK 21**, Android Studio **Otter 2025.2.1+** and Android SDK **36**.
-  Capacitor 8 targets minSdk 24 / compileSdk 36 / targetSdk 36.
-- No global dependencies are required; everything else is local to the project.
-
-## Install and run
+For a fresh clone:
 
 ```bash
-npm install
-npm run dev          # Vite dev server, http://localhost:5173
-npm run build        # production build into dist/
-npm run preview      # serve the production build locally
+git clone --recurse-submodules https://github.com/Adeeb-muhammad/App-project.git
+cd App-project
 ```
 
-The dev server respects `--host 0.0.0.0 --port <port>` for preview environments. Vite may
-need `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=<hostname>` when served through a proxy.
-
-## Demo preview mode
-
-The app never invents music in the user's library. The empty states are the default.
-To review the interface with fictional sample content, append **`?demo=1`** to the URL:
-
-```
-http://localhost:5173/?demo=1#/
-```
-
-- Demo mode is **off by default** and is never persisted to storage.
-- A fixed "Dev preview" chip appears while it is active.
-- The Now Playing screen states clearly that transport is a simulation.
-- All albums, artists, titles and SVG artwork are original and fictional.
-
-## Android / Capacitor
-
-The Android project has already been generated in `android/` and synced.
+For an existing checkout:
 
 ```bash
-npm run build                 # build web assets
-npx cap sync android          # copy dist + Capacitor config into the Android project
-npx cap open android          # open in Android Studio (requires the native toolchain)
-npm run android:debug         # build + sync + ./gradlew assembleDebug
+git submodule update --init --recursive
 ```
 
-With JDK 21 and Android SDK 36 installed, `./gradlew testDebugUnitTest assembleDebug
-assembleDebugAndroidTest` succeeds and produces `android/app/build/outputs/apk/debug/app-debug.apk`.
-The APK has **not** been installed on a physical device or emulator from this environment, so
-picker, audio, background playback and notification/lock-screen controls still need a device
-pass. See [docs/TESTING.md](docs/TESTING.md) for exactly what was and was not verified.
+The submodule is pinned to InterTune commit `9f4248d76d04d808a3215427db7a828f38c1a8fd` from its `visionos-fix` branch. Recursive checkout is required because InterTune itself uses three submodules.
 
-### Importing and playing a file
+## Build Android
 
-1. Open **Library** and press **Import audio**.
-2. Pick one audio file with Android’s document picker.
-3. The app takes a persistable read grant for that URI only; no storage permission is used.
-4. The track appears in Library and can be played, paused, seeked and stopped.
-5. Playback is owned by `PlaybackService` (Media3 `MediaSessionService`), so it continues
-   when the app is backgrounded and through the notification / lock-screen controls.
-
-### Personal library features
-
-- Create, rename and delete playlists; add tracks from Library and remove them from a playlist.
-- Liked Songs and personal 1–5 star track ratings.
-- Recently played collections, derived from the tracks you start.
-- Track title/artist/album edits, genre, language, tags and private notes are stored separately on this device in
-  `cinematic.track-metadata.v1`; original imported audio files and picker records are not rewritten.
-- Playlist membership, likes, ratings and play history stay on this device in
-  `cinematic.personal.v1`; there are no accounts, cloud uploads or sync.
-- The demo preview remains read-only and separate from your real collection.
-
-### YouTube audio import and yt-dlp updates
-
-The Android app can import audio from a YouTube URL that the user supplies. Before each
-user-started download, it checks the **official yt-dlp stable release** on GitHub and updates
-the app-private yt-dlp executable only when the release tag has changed. This keeps the
-download engine from remaining stuck on the older version bundled in the original APK.
-The check and any update require an internet connection; no background updater runs.
-
-Only use this feature for audio you own or are authorised to download. Imported MP3s are
-stored in the app-private downloads folder and appear as ordinary local library tracks.
-
-### Tests and CI
+Requirements: JDK 21 and Android SDK 36.
 
 ```bash
-npm test         # unit tests (Node built-in runner, no extra dependencies)
-npm run verify   # tests + production build
+cd android
+./gradlew :app:assembleCoreDebug
 ```
 
-Browser checks (Playwright is test-only, not a project dependency):
+Run native unit tests:
 
-- `tests/e2e/now-playing.mjs` — the full demo/player regression flow.
-- `tests/e2e/native-playback.mjs` — the Android-only import path and the browser’s honest
-  “native playback requires the app” fallback.
-
-GitHub Actions runs `npm ci`, `npm test`, `npm run build`, both browser checks, then on Android:
-`cap sync`, `testDebugUnitTest`, `assembleDebug`, `assembleDebugAndroidTest`, and an `aapt2`
-inspection of the built APK (package, version, permissions, backup flag).
-
-### Versioning, privacy and security
-
-The app version lives in `package.json` only; Android reads it from there (details in
-[docs/SECURITY.md](docs/SECURITY.md)). The app requests only media-playback permissions
-(foreground service, media playback type, notifications, wake lock), disables cloud backup
-and device transfer, and has no background network traffic by design. The optional YouTube importer
-is a user-started exception: it contacts the supplied source and checks the official yt-dlp
-stable-release endpoint when a download is started.
-
-### Renaming the app
-
-1. Edit `capacitor.config.ts` (`appName`, `appId`).
-2. Run `npx cap sync android`.
-3. For the package id, also update `android/app/build.gradle` (`namespace`,
-   `applicationId`) and the package declaration in
-   `android/app/src/main/java/com/personal/cinematicmusic/MainActivity.java`.
-4. For the display name, update `android/app/src/main/res/values/strings.xml`.
-
-## Project structure
-
-```
-index.html                 App shell document
-package.json               Scripts and pinned dependency ranges
-vite.config.js             Vite build config (ES2020 target for Android WebView)
-capacitor.config.ts        Capacitor 8 app identity and webDir
-src/
-  main.js                  Entry point: styles, demo gate, store, shell
-  app/shell.js             Persistent frame, routing glue, delegated actions
-  pages/                   home, library, playlists, playlist, album, player, settings, not-found
-  components/              navigation, mini-player, album-card, song-row, artwork,
-                           empty-state, section-header, icon
-  state/store.js           Library + UI state
-  state/player.js          Playback boundary: native, demo simulation or unavailable
-  native/native-audio.js   Capacitor plugin bridge to Kotlin Media3 service
-  native/audio-import.js   Storage Access Framework picker wrapper
-  data/imported.js         Imported-track validation, localStorage and view model
-  data/demo-data.js        Fictional development-only library
-  data/library.js          Library view model, empty by default
-  utils/                   navigation (hash router), demo-mode, dom, format, safe (data boundary)
-  styles/                  global, layout, components, home, library, playlists, player, settings
-public/
-  artwork/                 Eight original abstract SVG artworks
-  fonts/                   Self-hosted OFL fonts (Instrument Serif, Manrope) + licences
-tests/                     Unit tests (npm test) and e2e/ browser scripts
-.github/workflows/         Active CI (web, browser E2E, Android build + APK inspection)
-docs/                      Product spec, architecture, roadmap, tasks, testing, security
-android/                   Capacitor Android project, Media3 plugin + PlaybackService in Kotlin
+```bash
+./gradlew :app:testCoreDebugUnitTest
 ```
 
-## Documentation
+The debug APK is written under `android/app/build/outputs/apk/core/debug/`. GitHub Actions builds it and uploads an artifact for each passing pull request or main-branch run.
 
-- [docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md) — vision, screens, demo-data policy, design system.
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — module map, routing, state, Capacitor and native plans.
-- [docs/DEVELOPMENT_ROADMAP.md](docs/DEVELOPMENT_ROADMAP.md) — phased plan.
-- [docs/TASKS.md](docs/TASKS.md) — exact implementation status and remaining work.
-- [docs/TESTING.md](docs/TESTING.md) — commands run, actual results and gaps.
-- [docs/SECURITY.md](docs/SECURITY.md) — backup, permissions, FileProvider, signing, versioning.
+## What the Android app includes
 
-## Design notes
+InterTune's upstream project provides YouTube Music search and playback, local music, playlists, downloads, synced lyrics, queue management, recommendations and other native Android music-player features. See the [upstream feature list](https://github.com/ItzSkyeYT/InterTune#features) for the complete list.
 
-- Palette tokens: `#08090D` background, `#11131A` secondary, `#191B25` elevated surface,
-  `#F4F1F8` primary text, `#A3A0AE` secondary text, `#A78BFA` / `#7C6BFF` accents,
-  `#282936` dividers.
-- Typography: Instrument Serif for display headings and Manrope for UI text, both
-  self-hosted (SIL OFL 1.1) so the app has no runtime network dependency.
-- All icons are inline SVG in `src/components/icon.js`; no icon library is used.
-- Layouts are mobile-first for 360–430px viewports and adapt to a desktop rail layout.
+YouTube Music playback is provided by InterTune's own implementation, not Spotify's API and not a YouTube Data API key configured by the user. Network access is needed for online search and streaming; local music remains available from the device.
 
-## Known limitations
+## Retained web prototype
 
-- Milestone 2A imports one file at a time and stores the list in `localStorage`, not SQLite.
-  There is no automatic scanning of device music and no playlist persistence.
-- Device testing is still owed: no picker, audio, background, notification or lock-screen run
-  has been performed on real hardware. The APK compiles and its manifest was inspected; that
-  is not the same as playback being verified.
-- The browser has no audio engine by design. It explains this instead of pretending to play,
-  except in the clearly labelled `?demo=1` preview.
-- Personal playlists, Liked Songs, track ratings and recent-play history are stored in localStorage; a SQLite migration and export/import are still future work.
-- No app icon or splash screen has been produced yet.
-- Keyboard-only and screen-reader walkthroughs and desktop layout were not inspected.
+The root Vite project and its browser tests are retained as a separate prototype. They are not packaged into the native Android APK. The Android build is the InterTune project in `android/`.
+
+## Licensing
+
+InterTune is licensed under **GNU GPL version 3.0**. Its source and licence remain in the submodule. Any redistribution of a binary built from this Android project must comply with GPL-3.0, including providing the corresponding source and preserving required notices. InterTune's nested dependencies retain their own licence terms.
+
+- [InterTune source repository](https://github.com/ItzSkyeYT/InterTune)
+- [InterTune GPL-3.0 licence](https://github.com/ItzSkyeYT/InterTune/blob/visionos-fix/LICENSE)
