@@ -73,6 +73,17 @@ pass. See [docs/TESTING.md](docs/TESTING.md) for exactly what was and was not ve
 5. Playback is owned by `PlaybackService` (Media3 `MediaSessionService`), so it continues
    when the app is backgrounded and through the notification / lock-screen controls.
 
+### YouTube audio import and yt-dlp updates
+
+The Android app can import audio from a YouTube URL that the user supplies. Before each
+user-started download, it checks the **official yt-dlp stable release** on GitHub and updates
+the app-private yt-dlp executable only when the release tag has changed. This keeps the
+download engine from remaining stuck on the older version bundled in the original APK.
+The check and any update require an internet connection; no background updater runs.
+
+Only use this feature for audio you own or are authorised to download. Imported MP3s are
+stored in the app-private downloads folder and appear as ordinary local library tracks.
+
 ### Tests and CI
 
 ```bash
@@ -95,7 +106,9 @@ inspection of the built APK (package, version, permissions, backup flag).
 The app version lives in `package.json` only; Android reads it from there (details in
 [docs/SECURITY.md](docs/SECURITY.md)). The app requests only media-playback permissions
 (foreground service, media playback type, notifications, wake lock), disables cloud backup
-and device transfer, and has no network access by design.
+and device transfer, and has no background network traffic by design. The optional YouTube importer
+is a user-started exception: it contacts the supplied source and checks the official yt-dlp
+stable-release endpoint when a download is started.
 
 ### Renaming the app
 

@@ -47,21 +47,23 @@ Milestone 2A adds real playback, so the source manifest now declares exactly fou
 | `FOREGROUND_SERVICE_MEDIA_PLAYBACK` | Declares the foreground-service type required on API 34+. |
 | `POST_NOTIFICATIONS` | Media3’s playback notification on API 33+; requested at first playback. |
 | `WAKE_LOCK` | ExoPlayer’s local wake mode so audio is not cut off with the screen off. |
-| `INTERNET` | Used **only** by the optional “save a YouTube link as MP3” download. The rest of the app is local and works with no connection. |
+| `INTERNET` | Used **only** by the user-started YouTube audio import: to access the URL the user supplies and check/download the official yt-dlp stable release when the stored executable is out of date. The rest of the app is local. |
 
 **No storage permission is requested.** File access is the Storage Access Framework
 (`ACTION_OPEN_DOCUMENT`, `audio/*`) plus a persistable read grant for the one URI the user
 picked. There is no `READ_EXTERNAL_STORAGE`, `READ_MEDIA_AUDIO` or `MANAGE_EXTERNAL_STORAGE`,
 and no scanning of the device library.
 
-- **`INTERNET` is limited to downloads.** Capacitor still serves the bundled app from
-  `https://localhost` through an in-process WebView request interceptor
-  (`androidScheme: 'https'`), so the UI itself opens no socket. The permission is declared
-  because the optional download runs yt-dlp against a URL the user pasted; nothing is sent
-  anywhere else, there is no analytics or telemetry, and playback remains fully offline once
-  a file is saved. Media3’s datasource manifest contributes `ACCESS_NETWORK_STATE`; the
-  manifest removes it with `tools:node="remove"` because only local documents are played
-  (yt-dlp opens sockets directly and does not need the connectivity state).
+- **`INTERNET` is limited to the user-started YouTube importer and its updater.**
+  Capacitor still serves the bundled app from `https://localhost` through an in-process
+  WebView request interceptor (`androidScheme: 'https'`), so the ordinary UI opens no socket.
+  When the user starts an import, yt-dlp accesses the URL they supplied; before executing the
+  download, the app checks the official yt-dlp stable-release endpoint on GitHub and downloads
+  a replacement executable only when its release tag has changed. The updated binary is stored
+  in app-private `noBackupFilesDir` storage, not in the repository or shared storage. There is
+  no analytics or telemetry, and playback remains local once a file is saved. Media3’s datasource
+  manifest contributes `ACCESS_NETWORK_STATE`; the manifest removes it with
+  `tools:node="remove"` because the app uses direct network requests for this optional feature.
 - The **merged** manifest may still contain an app-private
   `<package>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` entry that AndroidX Core adds.
   The `aapt2` inspection of the built debug APK confirmed exactly the five permissions above

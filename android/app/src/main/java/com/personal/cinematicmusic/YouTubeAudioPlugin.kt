@@ -60,6 +60,17 @@ class YouTubeAudioPlugin : Plugin() {
                 YoutubeDL.getInstance().init(appContext)
                 FFmpeg.getInstance().init(appContext)
 
+                // The APK-bundled yt-dlp can age out. Check the official stable
+                // release before each user-started download; the updater only
+                // downloads a replacement when GitHub reports a new release tag.
+                // The replacement is kept in app-private noBackupFilesDir storage.
+                val updateStatus = YoutubeDL.getInstance().updateYoutubeDL(
+                    appContext,
+                    YoutubeDL.UpdateChannel.STABLE
+                )
+                val activeYtDlpVersion = YoutubeDL.versionName(appContext) ?: "bundled"
+                Log.i(TAG, "yt-dlp update status=$updateStatus, active version=$activeYtDlpVersion")
+
                 val request = YoutubeDLRequest(url).apply {
                     addOption("--no-mtime")
                     addOption("--no-playlist")
