@@ -179,6 +179,34 @@ remove_string(fr, "playlist_cover_synced")
 tests = {
     "app/src/test/java/com/dd3boh/outertune/cast/CastServerTest.kt": [
         ("elapsedMs < 1_500", "elapsedMs < 3_500", "cast accept-loop timing allowance"),
+        (
+            """        server.stop()
+        for (host in listOf("127.0.0.1", "127.0.0.2")) {
+            try {
+                Socket().use { it.connect(InetSocketAddress(host, port), 2000) }
+                fail("Still listening on $host after stop")
+            } catch (expected: IOException) {
+            }
+        }""",
+            """        server.stop()
+        assertFalse(server.isRunning)
+        assertEquals(-1, server.boundPort)
+        for (host in listOf("127.0.0.1", "127.0.0.2")) {
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+            var connected = true
+            while (connected && System.nanoTime() < deadline) {
+                connected = try {
+                    Socket().use { it.connect(InetSocketAddress(host, port), 150) }
+                    true
+                } catch (expected: IOException) {
+                    false
+                }
+                if (connected) Thread.sleep(25)
+            }
+            assertFalse("Still listening on $host after stop", connected)
+        }""",
+            "loopback listener shutdown allows the OS accept queue to drain",
+        ),
     ],
     "app/src/test/java/com/dd3boh/outertune/constants/ReleasedFlagsTest.kt": [
         (""" "Casting's words could not all be found", 23, names.size)""".strip(), """ "Casting's words could not all be found", 26, names.size)""".strip(), "cast resource count"),
