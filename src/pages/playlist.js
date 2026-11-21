@@ -50,7 +50,7 @@ export const playlistPage = {
         </div>
       </header>
 
-      ${playlist.isSystem ? '' : `<form class="playlist-edit" data-role="rename-playlist-form" data-playlist-id="${escapeHtml(playlist.id)}">
+      ${state.demo || playlist.isSystem ? '' : `<form class="playlist-edit" data-role="rename-playlist-form" data-playlist-id="${escapeHtml(playlist.id)}">
         <label class="sr-only" for="edit-playlist-name">Playlist name</label>
         <input id="edit-playlist-name" name="name" class="search__input" maxlength="40" required value="${escapeHtml(playlist.name)}" />
         <label class="sr-only" for="edit-playlist-description">Playlist description</label>
@@ -61,7 +61,7 @@ export const playlistPage = {
 
       ${playlist.tracks.length
         ? `<ul class="song-list" data-queue="playlist-tracks">
-            ${playlist.tracks.map((track, index) => songRow(track, { number: index + 1, playlistId: playlist.id })).join('')}
+            ${playlist.tracks.map((track, index) => songRow(track, { number: index + 1, playlistId: playlist.id, showUtilities: !state.demo })).join('')}
           </ul>`
         : emptyState({
             iconName: 'music',
