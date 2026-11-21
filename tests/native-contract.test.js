@@ -206,6 +206,8 @@ test('MediaController is pinned to main and controller work is marshalled there'
   assert.ok(plugin.includes('private fun dispatchToControllerThread'));
   assert.ok(plugin.includes('.setApplicationLooper(Looper.getMainLooper())'));
   assert.ok(plugin.includes('private fun withController(') && plugin.includes('dispatchToControllerThread {'));
+  const connectionCallback = plugin.slice(plugin.indexOf('future.addListener'), plugin.indexOf('ContextCompat.getMainExecutor(context)', plugin.indexOf('future.addListener')));
+  assert.ok(connectionCallback.indexOf('block(connected)') < connectionCallback.indexOf('controller = mediaController'), 'do not cache a controller until its first command succeeds');
   const stopBody = plugin.slice(plugin.indexOf('fun stop'), plugin.indexOf('fun seekTo'));
   assert.ok(stopBody.includes('dispatchToControllerThread {'));
   const getStateBody = plugin.slice(plugin.indexOf('fun getState'), plugin.indexOf('// ------------------------------------------------------------ connection'));
