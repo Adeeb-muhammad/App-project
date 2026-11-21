@@ -12,6 +12,7 @@ import { filterSongs } from '../src/data/library.js';
 import {
   addImportedTrack,
   buildImportedLibrary,
+  loadImportedTracks,
   STORAGE_KEY as IMPORTED_STORAGE_KEY,
 } from '../src/data/imported.js';
 
@@ -48,7 +49,7 @@ test('metadata edits are saved separately from the original imported file record
   const storedImport = JSON.parse(values.get(IMPORTED_STORAGE_KEY))[0];
   assert.equal(storedImport.title, 'Original title');
   assert.equal(storedImport.artist, 'Original artist');
-  assert.equal(storedImport.album, 'Original album');
+  assert.equal(storedImport.albumTitle, 'Original album');
   assert.equal(values.has(STORAGE_KEY), true);
 
   const metadata = getTrackMetadata(trackId);
@@ -77,7 +78,7 @@ test('metadata overlays update library grouping without mutating the source reco
     notes: '',
   });
 
-  const library = buildImportedLibrary();
+  const library = buildImportedLibrary(loadImportedTracks());
   assert.equal(library.songs[0].title, 'Edited title');
   assert.equal(library.songs[0].artist, 'Edited artist');
   assert.equal(library.songs[0].albumTitle, 'Edited album');
