@@ -76,3 +76,61 @@
     padding: 22px;
   }
 }
+
+
+/* ---------- Library filtering and sorting ---------- */
+
+.library-tools {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.library-tools .search {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.library-tools__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+
+.library-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.library-control__select {
+  min-height: 38px;
+  max-width: min(52vw, 220px);
+  padding: 8px 30px 8px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  color: var(--text);
+  background: rgba(25, 27, 37, 0.86);
+  font-size: 12px;
+  outline: none;
+}
+
+.library-control__select:focus-visible {
+  border-color: rgba(167, 139, 250, 0.5);
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.12);
+}
+
+@media (min-width: 720px) {
+  .library-tools {
+    grid-template-columns: minmax(240px, 1fr) auto;
+    align-items: center;
+  }
+
+  .library-tools__controls {
+    justify-content: flex-end;
+  }
+}
