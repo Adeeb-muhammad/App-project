@@ -49,7 +49,7 @@ export const albumPage = {
       </header>
 
       <ul class="song-list" data-queue="album-tracks">
-        ${album.tracks.map((track) => songRow(track, { number: track.trackNumber, showArtwork: false })).join('')}
+        ${album.tracks.map((track) => songRow(track, { number: track.trackNumber, showArtwork: false, showUtilities: !state.demo })).join('')}
       </ul>
     </div>`;
   },
