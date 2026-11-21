@@ -285,7 +285,7 @@
   bottom: 0;
   z-index: 40;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 2px;
   padding: 8px var(--gutter) calc(env(safe-area-inset-bottom) + 8px);
   background: rgba(9, 10, 15, 0.9);
@@ -303,9 +303,9 @@
   padding: 7px 4px;
   border-radius: 14px;
   color: var(--text-muted);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0;
   transition: color 0.2s;
 }
 

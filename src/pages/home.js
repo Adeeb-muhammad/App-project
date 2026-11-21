@@ -79,7 +79,7 @@ function emptyHome() {
     <header class="screen-head">
       <p class="eyebrow">${greeting()}</p>
       <h1 class="screen-head__title" tabindex="-1">Your sound, after dark.</h1>
-      <p class="screen-head__sub">Cinematic Music keeps your collection on this device. No account, no streaming, no noise.</p>
+      <p class="screen-head__sub">Cinematic Music keeps your imported music on this device and lets you discover videos online.</p>
     </header>
 
     <section class="intro-panel" aria-labelledby="intro-title">
@@ -89,7 +89,7 @@ function emptyHome() {
           iconName: 'music',
           title: 'Your library is quiet',
           description:
-            'Import an audio file from this device to begin. It stays on your phone and plays through AndroidX Media3, even when the app is in the background.',
+            'Import audio for offline playback, or open Discover to search YouTube videos and playlists.',
           hint,
           action: `${isAndroidNative()
             ? `<button class="button button--primary" type="button" data-action="import-audio">Import audio</button>`
@@ -111,7 +111,7 @@ function emptyHome() {
         </li>
         <li class="next-steps__item">
           <span class="next-steps__icon" aria-hidden="true">${icon('sparkles', { size: 18 })}</span>
-          <span><strong>Built to stay offline</strong><span>Artwork, type and interface assets ship with the app bundle.</span></span>
+          <span><strong>Online discovery</strong><span>Search YouTube when you are connected; your imported music stays available offline.</span></span>
         </li>
       </ul>
     </section>
