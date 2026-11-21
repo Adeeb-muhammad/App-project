@@ -87,7 +87,7 @@ jobs:
       - name: Inspect the built APK (package, version, permissions, backup)
         run: |
           set -euo pipefail
-          APK=$(find app/build/outputs/apk/core/debug -maxdepth 1 -type f -name '*.apk' | head -n 1)
+          APK=$(find android/app/build/outputs/apk/core/debug -maxdepth 1 -type f -name '*.apk' | head -n 1)
           test -n "$APK" && test -f "$APK"
           AAPT2=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
           BADGING=$("$AAPT2" dump badging "$APK")
