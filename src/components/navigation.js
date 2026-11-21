@@ -3,6 +3,7 @@ import { href } from '../utils/navigation.js';
 
 const ITEMS = [
   { route: 'home', label: 'Home', path: '/', icon: 'home' },
+  { route: 'discover', label: 'Discover', path: '/discover', icon: 'search' },
   { route: 'library', label: 'Library', path: '/library', icon: 'library' },
   { route: 'playlists', label: 'Playlists', path: '/playlists', icon: 'playlists' },
   { route: 'settings', label: 'Settings', path: '/settings', icon: 'settings' },
@@ -25,6 +26,8 @@ export function navigation() {
 
 const ACTIVE_BY_ROUTE = {
   home: 'home',
+  discover: 'discover',
+  youtubePlayer: 'discover',
   library: 'library',
   album: 'library',
   playlists: 'playlists',
