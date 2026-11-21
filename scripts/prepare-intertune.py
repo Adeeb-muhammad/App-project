@@ -60,8 +60,10 @@ def write(relative: str, content: str) -> None:
 
 def replace_once(relative: str, old: str, new: str, label: str) -> None:
     text = read(relative)
-    if new in text:
-        return
+    if old not in text:
+        if new and new in text:
+            return
+        fail(f"{label}: neither the original nor prepared text is present in android/{relative}")
     count = text.count(old)
     if count != 1:
         fail(f"{label}: expected one match in android/{relative}, found {count}")
@@ -164,6 +166,10 @@ for key in [
 ]:
     remove_string(en, key)
     remove_string(fr, key)
+# This ninth matching resource is an orphan: the pinned source no longer references it.
+# Keep the playlist_cover_* prefix reserved for the eight labels in the cover picker.
+remove_string(en, "playlist_cover_synced")
+remove_string(fr, "playlist_cover_synced")
 
 # The source already routes the Songs-tab empty state to these distinct messages.
 # Both locales are deliberately locked until their wording is reviewed together.
