@@ -30,3 +30,18 @@ test('invalid routes resolve to notFound', () => {
   assert.equal(parseRoute('#/nope').name, 'notFound');
   assert.equal(parseRoute('#/albums').name, 'notFound');
 });
+
+
+test('parses YouTube discovery and safe video watch routes', () => {
+  assert.equal(parseRoute('#/discover').name, 'discover');
+  const watch = parseRoute('#/watch/video/dQw4w9WgXcQ');
+  assert.equal(watch.name, 'youtubePlayer');
+  assert.equal(watch.mediaType, 'video');
+  assert.equal(watch.id, 'dQw4w9WgXcQ');
+});
+
+test('rejects unsupported YouTube watch routes and malformed video ids', () => {
+  for (const hash of ['#/watch', '#/watch/playlist/PLabc', '#/watch/video/short', '#/watch/video/%E0%A4%A']) {
+    assert.equal(parseRoute(hash).name, 'notFound', hash);
+  }
+});
