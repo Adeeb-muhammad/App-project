@@ -23,7 +23,7 @@ function storage() {
 
 function cleanText(value, max = 80) {
   if (typeof value !== 'string') return '';
-  return value.replace(/\\s+/g, ' ').trim().slice(0, max);
+  return value.replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
 function cleanIds(value, max = 500) {
