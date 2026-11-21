@@ -158,6 +158,8 @@ test('a reconnected service gets its queue and playback modes back', () => {
   assert.match(plugin, /private var lastItems: List<MediaItem>/);
   assert.match(plugin, /restoreQueueIfNeeded\(/);
   assert.match(plugin, /mediaController\.setMediaItems\(lastItems, lastIndex, lastPositionMs\)/);
+  assert.match(plugin, /call\.getLong\("positionMs"\)/);
+  assert.match(plugin, /mediaController\.setMediaItems\(items, safeIndex, requestedPositionMs\)/);
   assert.match(plugin, /mediaController\.shuffleModeEnabled = lastShuffleEnabled/);
   assert.match(plugin, /mediaController\.repeatMode = lastRepeatMode/);
   assert.match(plugin, /if \(lastWasPlaying\) mediaController\.play\(\)/);
