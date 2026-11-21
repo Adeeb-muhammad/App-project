@@ -118,9 +118,9 @@ ${state.demo ? '' : `        <div class="track-rating" role="group" aria-label="
           <span class="track-rating__stars">
             ${[1, 2, 3, 4, 5].map((rating) => {
               const selected = rating <= getTrackRating(track.id);
-              return \`<button class="track-rating__star${selected ? ' is-selected' : ''}" type="button"
+              return `<button class="track-rating__star${selected ? ' is-selected' : ''}" type="button"
                 data-action="rate-track" data-track-id="${escapeHtml(track.id)}" data-rating="${rating}"
-                aria-label="Rate ${rating} out of 5" aria-pressed="${selected}">${selected ? '★' : '☆'}</button>\`;
+                aria-label="Rate ${rating} out of 5" aria-pressed="${selected}">${selected ? '★' : '☆'}</button>`;
             }).join('')}
           </span>
         </div>`}
