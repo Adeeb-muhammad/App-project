@@ -126,13 +126,28 @@ check('queue dialog open', await page.locator('dialog[data-role="queue"]').evalu
 const rowCount = await page.locator('.queue-row').count();
 check('queue lists tracks', rowCount > 1, `rows=${rowCount}`);
 check('queue marks current track', (await page.locator('.queue-row--current .queue-row__title').textContent()) === firstTitle);
-const target = page.locator('.queue-row:not(.queue-row--current)').nth(1);
+const firstUpcoming = page.locator('.queue-entry').nth(1);
+const firstUpcomingTitle = await firstUpcoming.locator('.queue-row__title').textContent();
+await firstUpcoming.locator('[data-action="queue-move"][data-direction="1"]').click();
+check('queue can move a track down', (await page.locator('.queue-entry').nth(2).locator('.queue-row__title').textContent()) === firstUpcomingTitle);
+await page.locator('.queue-entry').nth(2).locator('[data-action="queue-move"][data-direction="-1"]').click();
+check('queue can move a track back up', (await page.locator('.queue-entry').nth(1).locator('.queue-row__title').textContent()) === firstUpcomingTitle);
+const beforeRemove = await page.locator('.queue-row').count();
+await page.locator('.queue-entry').last().locator('[data-action="remove-queue-track"]').click();
+check('queue removes an upcoming track', await page.locator('.queue-row').count() === beforeRemove - 1);
+const target = page.locator('.queue-row:not(.queue-row--current)').first();
 const targetTitle = await target.locator('.queue-row__title').textContent();
 const rQ = await rendersDuring(() => target.click());
 check('selecting queued track changes title', (await title()) === targetTitle, targetTitle);
 check('queue selection renders at most 2 times', rQ <= 2, `renders=${rQ}`);
 check('queue highlights newly selected track', (await page.locator('.queue-row--current .queue-row__title').textContent()) === targetTitle);
 check('mini-player synced after queue select', (await playerState()).mini === targetTitle);
+const clearButton = page.locator('[data-action="clear-upcoming"]');
+if (await clearButton.isVisible()) {
+  await clearButton.click();
+  check('clear upcoming keeps the active track in the queue', await page.locator('.queue-row--current').count() === 1);
+  check('clear upcoming hides when nothing remains', await page.locator('[data-action="clear-upcoming"]').count() === 0);
+}
 await page.locator('[data-action="close-queue"]').click();
 check('queue closed', !(await page.locator('dialog[data-role="queue"]').evaluate((d) => d.open)));
 await alive('queue');
