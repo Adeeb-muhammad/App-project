@@ -1,56 +1,52 @@
 # Cinematic Music
 
-The Android app is now based on [InterTune](https://github.com/ItzSkyeYT/InterTune), a complete native Android music player. The pinned upstream checkout is brought in as the `android/` Git submodule, including its own nested dependencies.
+The Android app is based on [InterTune](https://github.com/ItzSkyeYT/InterTune), a complete native Android music player. The app uses InterTune's **Full** build variant, including its FFmpeg-backed media scanner and decoder components.
 
-**The Android app does not require you to create or paste a YouTube Data API key.** InterTune has its own YouTube Music search and playback implementation.
+**YouTube Music search and playback work without you supplying a YouTube Data API key.**
 
 ## Get the full source
 
-For a fresh clone:
+Fresh clone:
 
 ```bash
 git clone --recurse-submodules https://github.com/Adeeb-muhammad/App-project.git
 cd App-project
 ```
 
-For an existing checkout:
+Existing checkout:
 
 ```bash
 git submodule update --init --recursive
 ```
 
-The submodule is pinned to InterTune commit `9f4248d76d04d808a3215427db7a828f38c1a8fd` from its `visionos-fix` branch. Recursive checkout is required because InterTune itself uses three submodules.
+The Android source is pinned to InterTune commit `9f4248d76d04d808a3215427db7a828f38c1a8fd` from its `visionos-fix` branch. Recursive checkout is required for the nested dependencies.
 
 ## Build Android
 
-Requirements: JDK 21 and Android SDK 36.
+Requirements: Python 3, JDK 21, Android SDK 36, CMake 3.31.6 and NDK 29.0.13113456.
 
 ```bash
-cd android
-./gradlew :app:assembleCoreDebug
+npm run android:test
+npm run android:debug
 ```
 
-Run native unit tests:
+The preparation step patches the pinned source resources/tests and downloads the prebuilt FFmpeg libraries needed by the Full variant. The resulting debug APK is under `android/app/build/outputs/apk/full/debug/`.
 
-```bash
-./gradlew :app:testCoreDebugUnitTest
-```
+## Features
 
-The debug APK is written under `android/app/build/outputs/apk/core/debug/`. GitHub Actions builds it and uploads an artifact for each passing pull request or main-branch run.
+InterTune combines YouTube Music search and streaming with local music, playlists, offline downloads, synced lyrics, queue management, recommendations, song recognition, Chromecast/FCast/DLNA casting, equalizer and spatial-audio options, Android Auto support, widgets and more. See the [upstream feature list](https://github.com/ItzSkyeYT/InterTune#features).
 
-## What the Android app includes
+The Full variant is intentional: the lighter Core flavor excludes bundled FFmpeg scanning/decoder components.
 
-InterTune's upstream project provides YouTube Music search and playback, local music, playlists, downloads, synced lyrics, queue management, recommendations and other native Android music-player features. See the [upstream feature list](https://github.com/ItzSkyeYT/InterTune#features) for the complete list.
+## App identity and existing data
 
-YouTube Music playback is provided by InterTune's own implementation, not Spotify's API and not a YouTube Data API key configured by the user. Network access is needed for online search and streaming; local music remains available from the device.
+The upstream application ID is `dev.skye.intertune` (debug package: `dev.skye.intertune.debug`). It installs as a separate Android app from the previous Cinematic Music package; the old app and its stored data are not overwritten or automatically migrated.
 
-## Retained web prototype
+The root Vite project is retained as a separate web prototype and is not packaged into the native APK.
 
-The root Vite project and its browser tests are retained as a separate prototype. They are not packaged into the native Android APK. The Android build is the InterTune project in `android/`.
+## Licence
 
-## Licensing
+InterTune is licensed under **GNU GPL-3.0**. The upstream source, notices, and nested dependency licences are retained. Binary redistribution must meet GPL-3.0 and each dependency's licence conditions.
 
-InterTune is licensed under **GNU GPL version 3.0**. Its source and licence remain in the submodule. Any redistribution of a binary built from this Android project must comply with GPL-3.0, including providing the corresponding source and preserving required notices. InterTune's nested dependencies retain their own licence terms.
-
-- [InterTune source repository](https://github.com/ItzSkyeYT/InterTune)
-- [InterTune GPL-3.0 licence](https://github.com/ItzSkyeYT/InterTune/blob/visionos-fix/LICENSE)
+- [InterTune source](https://github.com/ItzSkyeYT/InterTune)
+- [GPL-3.0 licence](https://github.com/ItzSkyeYT/InterTune/blob/visionos-fix/LICENSE)
