@@ -165,6 +165,24 @@ test('shuffle and repeat modes are forwarded to Media3 bridge', () => {
   assert.equal(player.getPlayerState().repeatMode, 'queue');
 });
 
+test('queue edits are sent to Media3 with the active item and current position', async () => {
+  const bridge = fakeBridge();
+  player.configurePlayback({ mode: 'native', bridge });
+  player.playTrack(tracks, 't1');
+  player.seekRatio(0.35);
+
+  assert.equal(player.enqueueNext(tracks[2]), true);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  const queueCall = bridge.calls.filter(([name]) => name === 'setQueue').at(-1);
+  assert.deepEqual(queueCall[1].map((track) => track.id), ['t1', 't3', 't2']);
+  assert.equal(queueCall[2], 0);
+  assert.equal(queueCall[3], true);
+  assert.equal(queueCall[4], 35_000);
+  assert.equal(player.getPlayerState().track.id, 't1');
+  assert.equal(player.getPlayerState().position, 35);
+});
+
 test('syncFromNative pulls service state without a playback event', async () => {
   const bridge = fakeBridge({
     getState: async () => ({
