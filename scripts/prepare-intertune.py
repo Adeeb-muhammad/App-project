@@ -61,7 +61,7 @@ def write(relative: str, content: str) -> None:
 def replace_once(relative: str, old: str, new: str, label: str) -> None:
     text = read(relative)
     if old not in text:
-        if new and new in text:
+        if not new or new in text:
             return
         fail(f"{label}: neither the original nor prepared text is present in android/{relative}")
     count = text.count(old)
