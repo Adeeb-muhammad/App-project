@@ -8,6 +8,8 @@
  * cannot play.
  */
 
+import { buildPersonalCollections, getTrackRating, isFavourite } from './personal-library.js';
+
 const STORAGE_KEY = 'cinematic.imported.v1';
 const DEFAULT_PALETTE = ['#A78BFA', '#7C6BFF', '#191B25'];
 const MAX_TEXT = 300;
@@ -156,6 +158,8 @@ export function buildImportedLibrary(input = []) {
     // Same id the album grouping below uses, so album detail and Now Playing
     // can resolve the record exactly like they do for demo tracks.
     albumId: albumId(track.artist, track.albumTitle),
+    isFavourite: isFavourite(track.id),
+    rating: getTrackRating(track.id),
   }));
 
   const albumMap = new Map();
@@ -194,14 +198,20 @@ export function buildImportedLibrary(input = []) {
     };
   });
 
+  const personal = buildPersonalCollections(songs);
+  for (const album of albums) {
+    album.favourite = album.tracks.some((track) => track.isFavourite);
+  }
+
   return {
     albums,
     songs,
     artists,
-    playlists: [],
-    recentlyPlayed: [],
+    playlists: personal.playlists,
+    likedSongs: personal.likedSongs,
+    recentlyPlayed: personal.recentlyPlayed,
     recentlyAdded: albums.slice(0, 5),
-    favourites: [],
+    favourites: albums.filter((album) => album.favourite),
     featured: albums[0] ?? null,
     hasContent: songs.length > 0,
   };
