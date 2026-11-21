@@ -15,9 +15,9 @@ This document tracks the Joytify capabilities being adapted into Cinematic Music
 | Joytify capability | Cinematic Music status | Port approach |
 | --- | --- | --- |
 | Native audio player and progress | Existing | Keep Media3 and current scrubber fix |
-| Queue display and track selection | Existing basic queue | Add queue editing, remove/reorder, play-next and clear |
-| Shuffle | In progress in this port | Map to Media3 shuffle mode and simulation behavior |
-| Repeat off / current track / queue | In progress in this port | Map to Media3 repeat modes |
+| Queue display and track selection | Existing | Add queue editing, remove/reorder, play-next and clear |
+| Shuffle | Implemented in PR #11 | Map to Media3 shuffle mode and simulation behavior |
+| Repeat off / current track / queue | Implemented in PR #11 | Map to Media3 repeat modes |
 | Playlist create, edit, delete and assign tracks | Existing local feature | Extend with sort/arrangement options |
 | Liked Songs and 5-star ratings | Existing local feature | Retain |
 | Recently played | Existing local feature | Expand into listening history and stats |
@@ -42,12 +42,12 @@ This document tracks the Joytify capabilities being adapted into Cinematic Music
 
 ## Delivery order
 
-### Batch 1 — Playback controls
+### Batch 1 — Playback controls ✅
 - Shuffle and repeat modes, including Media3 integration and simulation tests.
 - Preserve the existing queue, local import path, background playback and scrubber behavior.
 
-### Batch 2 — Queue and library management
-- Reorder/remove queue entries, play-next, clear queue.
+### Batch 2 — Queue and library management (in progress)
+- Queue editing: play next, move upcoming tracks, remove upcoming tracks and clear upcoming tracks while keeping the active track playing.
 - Search all local songs/albums/artists with useful filtering and sorting.
 - Edit imported metadata and add tags, genres, language, lyrics and private notes.
 
