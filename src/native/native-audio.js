@@ -42,11 +42,12 @@ export function toNativeTrack(track) {
  */
 export function createNativeBridge() {
   return {
-    async setQueue(tracks, startIndex, autoplay) {
+    async setQueue(tracks, startIndex, autoplay, positionMs = 0) {
       await CinematicAudio.setQueue({
         tracks: tracks.map(toNativeTrack),
         startIndex,
         autoplay,
+        positionMs: Math.max(0, Math.round(positionMs)),
       });
     },
 
