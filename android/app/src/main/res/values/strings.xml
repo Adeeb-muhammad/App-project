@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">Cinematic Music</string>
-    <string name="title_activity_main">Cinematic Music</string>
-    <string name="package_name">com.personal.cinematicmusic</string>
-    <string name="custom_url_scheme">com.personal.cinematicmusic</string>
-</resources>
