@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Test-only manifest: the provider below lives in the test APK and is never
+     part of the shipped application. It exists so the device tests can play a
+     real content:// (Storage Access Framework style) URI. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <provider
+            android:name="com.personal.cinematicmusic.TestToneProvider"
+            android:authorities="com.personal.cinematicmusic.testtone"
+            android:exported="true" />
+    </application>
+
+</manifest>

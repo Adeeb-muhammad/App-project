@@ -13,6 +13,7 @@ const tracks = [
 
 function fakeBridge(overrides = {}) {
   let listener = null;
+  let eventListener = null;
   const calls = [];
   const bridge = {
     calls,
@@ -44,8 +45,17 @@ function fakeBridge(overrides = {}) {
         listener = null;
       };
     },
+    subscribeEvents(handler) {
+      eventListener = handler;
+      return () => {
+        eventListener = null;
+      };
+    },
     emit(state) {
       if (listener) listener(state);
+    },
+    emitEvent(event) {
+      if (eventListener) eventListener(event);
     },
     hasListener: () => listener !== null,
     ...overrides,
@@ -167,6 +177,68 @@ test('a failing native call surfaces a notice instead of throwing', async () => 
 
   assert.equal(notices.length, 1);
   assert.match(notices[0], /playback service/i);
+});
+
+test('an ExoPlayer failure stops the UI and explains why', () => {
+  const bridge = fakeBridge();
+  player.configurePlayback({ mode: 'native', bridge });
+  const notices = [];
+  const unsubscribe = player.subscribe(({ type, message }) => {
+    if (type === 'notice') notices.push(message);
+  });
+
+  player.playTrack(tracks, 't1');
+  assert.equal(player.getPlayerState().isPlaying, true);
+
+  bridge.emitEvent({ type: 'error', codeName: 'IO_NO_PERMISSION', message: 'Android can no longer open this file.' });
+
+  assert.equal(player.getPlayerState().isPlaying, false);
+  assert.deepEqual(notices, ['Android can no longer open this file.']);
+  unsubscribe();
+});
+
+test('a rejected setQueue does not leave the UI pretending to play', async () => {
+  const bridge = fakeBridge({ setQueue: () => Promise.reject(new Error('service down')) });
+  player.configurePlayback({ mode: 'native', bridge });
+  const originalError = console.error;
+  console.error = () => {};
+
+  player.playTrack(tracks, 't1');
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  console.error = originalError;
+  assert.equal(player.getPlayerState().isPlaying, false);
+  assert.equal(player.getPlayerState().track.id, 't1');
+});
+
+test('starting native playback asks for nothing else', () => {
+  const bridge = fakeBridge();
+  player.configurePlayback({ mode: 'native', bridge });
+  player.playTrack(tracks, 't1');
+
+  // No permission prompt and no extra round trip: the only native call that
+  // starting playback makes is the queue itself.
+  assert.deepEqual(bridge.calls.map(([name]) => name), ['setQueue']);
+  assert.equal(typeof bridge.requestNotificationPermission, 'undefined');
+});
+
+test('native playWhenReady and buffering snapshots are applied', () => {
+  const bridge = fakeBridge();
+  player.configurePlayback({ mode: 'native', bridge });
+  player.playTrack(tracks, 't1');
+
+  bridge.emit({
+    trackId: 't1',
+    playbackState: 'buffering',
+    playWhenReady: true,
+    isPlaying: false,
+    positionMs: 0,
+    durationMs: 100_000,
+  });
+
+  const state = player.getPlayerState();
+  assert.equal(state.isPlaying, false);
+  assert.equal(state.duration, 100);
 });
 
 test('a browser without native audio explains instead of pretending', () => {

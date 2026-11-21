@@ -40,9 +40,10 @@ object AudioMetadataReader {
                 ?.toLongOrNull()
                 ?: 0L
         } catch (error: Exception) {
-            // A corrupt or unsupported file still gets a row; ExoPlayer will
-            // report the actual playback failure to the user.
-            android.util.Log.w("AudioMetadata", "could not read tags for $uri", error)
+            // A corrupt or unsupported file still gets a row; ExoPlayer reports
+            // the actual playback failure through `playbackError`. Only the
+            // provider authority is logged, never the full content URI.
+            android.util.Log.w(TAG, "could not read tags from ${safeLabel(uri)}", error)
         } finally {
             runCatching { retriever.release() }
         }
@@ -78,8 +79,13 @@ object AudioMetadataReader {
                     }
                 }
         } catch (error: Exception) {
-            android.util.Log.w("AudioMetadata", "could not read display name", error)
+            android.util.Log.w(TAG, "could not read display name from ${safeLabel(uri)}", error)
         }
         return uri.lastPathSegment
     }
+
+    /** Loggable form of a content URI: scheme and provider only, no file path. */
+    private fun safeLabel(uri: Uri): String = "${uri.scheme}://${uri.authority}"
+
+    private const val TAG = "CinematicAudio"
 }

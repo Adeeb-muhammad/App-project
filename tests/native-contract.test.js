@@ -10,6 +10,8 @@ import { readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const stripComments = (xml) => xml.replace(/<!--[\s\S]*?-->/g, '');
+const stripKotlinComments = (source) =>
+  source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 
 const plugin = read('android/app/src/main/java/com/personal/cinematicmusic/CinematicAudioPlugin.kt');
 const service = read('android/app/src/main/java/com/personal/cinematicmusic/PlaybackService.kt');
@@ -22,7 +24,7 @@ const rootGradle = read('android/build.gradle');
 const variables = read('android/variables.gradle');
 
 test('the Capacitor plugin is named and registered', () => {
-  assert.match(plugin, /@CapacitorPlugin\(name = "CinematicAudio"\)/);
+  assert.match(plugin, /@CapacitorPlugin\(\s*name = "CinematicAudio"\s*,?\s*\)/);
   assert.match(mainActivity, /registerPlugin\(CinematicAudioPlugin\.class\)/);
   const js = read('src/native/native-audio.js');
   assert.match(js, /registerPlugin\('CinematicAudio'\)/);
@@ -77,6 +79,7 @@ test('only media playback permissions are requested, never storage access', () =
   assert.deepEqual(permissions, [
     'android.permission.FOREGROUND_SERVICE',
     'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK',
+    'android.permission.INTERNET',
     'android.permission.POST_NOTIFICATIONS',
     'android.permission.WAKE_LOCK',
   ]);
@@ -95,6 +98,102 @@ test('playback policy rejects non-content URIs and clamps queue indices', () => 
   assert.match(policy, /requested >= size -> size - 1/);
   const js = read('src/data/imported.js');
   assert.match(js, /\/\^content:\\\/\\\/\/i/);
+});
+
+test('native playback failures are forwarded instead of swallowed', () => {
+  assert.match(plugin, /override fun onPlayerError\(error: PlaybackException\)/);
+  assert.match(plugin, /notifyListeners\("playbackError"/);
+  assert.match(plugin, /PlaybackErrors\.userMessage/);
+  const errors = read('android/app/src/main/java/com/personal/cinematicmusic/PlaybackErrors.kt');
+  assert.match(errors, /ERROR_CODE_IO_NO_PERMISSION/);
+  assert.match(errors, /ERROR_CODE_IO_FILE_NOT_FOUND/);
+  assert.match(errors, /fun userMessage\(errorCode: Int\): String/);
+});
+
+test('the plugin builds exactly one MediaController connection', () => {
+  const builds = [...plugin.matchAll(/MediaController\.Builder\s*\(/g)].length;
+  assert.equal(builds, 1, 'the controller must be created in one place only');
+  assert.match(plugin, /pendingController: ListenableFuture<MediaController>\?/);
+  assert.match(plugin, /existing\.isConnected/);
+  assert.match(plugin, /pendingController\?\.cancel\(true\)/);
+});
+
+test('the media notification is never requested at runtime', () => {
+  // Media3 posts the notification. A denial only hides it, so prompting or
+  // warning about it was noise and has been removed from every layer.
+  for (const source of [plugin, read('src/native/native-audio.js'), read('src/state/player.js')]) {
+    assert.ok(!/requestNotificationPermission/.test(source), 'no runtime permission request');
+    assert.ok(!/askForNotificationPermission/.test(source));
+  }
+  assert.ok(!/PermissionCallback|requestPermissionForAlias/.test(plugin));
+  assert.ok(!/playbackWarning/.test(plugin), 'no advisory warning channel');
+  // The permission stays declared so the system may show the notification.
+  assert.match(manifest, /android\.permission\.POST_NOTIFICATIONS/);
+});
+
+test('metadata extraction leaves the main thread', () => {
+  assert.match(plugin, /metadataExecutor\.execute/);
+  assert.match(plugin, /canRead\(uri\)/);
+});
+
+test('task removal defers to the Media3 policy instead of a second opinion', () => {
+  const serviceCode = stripKotlinComments(service);
+  assert.match(serviceCode, /override fun onTaskRemoved/);
+  assert.match(serviceCode, /super\.onTaskRemoved\(rootIntent\)/);
+  assert.ok(
+    !/stopSelf\(\)/.test(serviceCode),
+    'the app must not stop the service on its own verdict',
+  );
+  assert.match(manifest, /android:stopWithTask="false"/);
+  assert.match(service, /override fun onPlayerError/);
+  assert.match(service, /error\.errorCodeName/);
+  assert.match(serviceCode, /PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS/);
+  assert.match(serviceCode, /PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY/);
+});
+
+test('a reconnected service gets its queue back', () => {
+  assert.match(plugin, /private var lastItems: List<MediaItem>/);
+  assert.match(plugin, /restoreQueueIfNeeded\(/);
+  assert.match(plugin, /mediaController\.setMediaItems\(lastItems, lastIndex, lastPositionMs\)/);
+  assert.match(plugin, /if \(lastWasPlaying\) mediaController\.play\(\)/);
+});
+
+test('the JS player rolls back optimistic state on native failures', () => {
+  const js = read('src/state/player.js');
+  assert.match(js, /function handleNativeEvent/);
+  assert.match(js, /subscribeEvents/);
+  assert.match(js, /if \(!accepted\)/);
+});
+
+test('YouTube downloads become ordinary local tracks', () => {
+  const downloadPlugin = read(
+    'android/app/src/main/java/com/personal/cinematicmusic/YouTubeAudioPlugin.kt',
+  );
+  const urlPolicy = read(
+    'android/app/src/main/java/com/personal/cinematicmusic/YouTubeUrlPolicy.kt',
+  );
+  const js = read('src/native/youtube-audio.js');
+
+  assert.match(mainActivity, /registerPlugin\(YouTubeAudioPlugin\.class\)/);
+  assert.match(js, /registerPlugin\('YouTubeAudio'\)/);
+  assert.match(downloadPlugin, /@CapacitorPlugin\(name = "YouTubeAudio"\)/);
+  assert.match(downloadPlugin, /@PluginMethod\s+fun download\(call: PluginCall\)/);
+  // Audio only, converted to MP3 with the bundled FFmpeg.
+  assert.match(downloadPlugin, /addOption\("-x"\)/);
+  assert.match(downloadPlugin, /addOption\("--audio-format", "mp3"\)/);
+  assert.match(downloadPlugin, /YoutubeDL\.getInstance\(\)\.init\(/);
+  assert.match(downloadPlugin, /FFmpeg\.getInstance\(\)\.init\(/);
+  // The result must reach the player as a content:// URI, never a file path.
+  assert.match(downloadPlugin, /FileProvider\.getUriForFile/);
+  assert.match(downloadPlugin, /AudioMetadataReader\.read\(/);
+  assert.ok(!/setUri\("file:\/\//.test(downloadPlugin));
+  // Links are gated by a pure policy the unit tests cover.
+  assert.match(urlPolicy, /youtu\.be/);
+  assert.match(urlPolicy, /endsWith\("\.youtube\.com"\)/);
+  assert.match(variables, /youtubedlAndroidVersion = '\d+\.\d+\.\d+'/);
+  assert.match(gradle, /youtubedl-android:library:\$youtubedlAndroidVersion/);
+  assert.match(gradle, /youtubedl-android:ffmpeg:\$youtubedlAndroidVersion/);
+  assert.match(manifest, /android\.permission\.INTERNET/);
 });
 
 test('Media3 version is pinned in one place', () => {

@@ -90,5 +90,24 @@ export function createNativeBridge() {
           .catch(() => {});
       };
     },
+
+    /**
+     * Failures pushed by the native service. `playbackError` means ExoPlayer
+     * really stopped; there is no advisory channel, because nothing the app can
+     * observe without a device (a hidden media notification, for instance) is
+     * worth interrupting the listener with.
+     */
+    subscribeEvents(listener) {
+      let active = true;
+      const handle = CinematicAudio.addListener('playbackError', (event) => {
+        if (active) listener({ ...event, type: 'error' });
+      });
+      return () => {
+        active = false;
+        Promise.resolve(handle)
+          .then((registration) => registration.remove())
+          .catch(() => {});
+      };
+    },
   };
 }

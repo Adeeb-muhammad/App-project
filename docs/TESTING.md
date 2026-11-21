@@ -260,3 +260,88 @@ With JDK 21 and SDK 36 available:
 cd android && ./gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
+
+## Android playback reliability fix (`fix/android-playback-reliability`)
+
+Branch base: `main` after PR #4. This revision drops the notification-permission prompt that the
+first pass added and treats the one-second playback stop as the real bug.
+
+What changed, and why:
+
+- **No runtime notification prompt and no warning about it.** Media3 posts the media
+  notification itself, and a denied `POST_NOTIFICATIONS` only hides that notification. It does
+  not stop playback. The Capacitor permission alias, `requestNotificationPermission`, the
+  `playbackWarning` event and the JavaScript caller are gone. The permission stays *declared* in
+  the manifest so the system can show the notification once the user allows it in settings.
+- **The queue belongs to the service, and the plugin puts it back.** Android may destroy and
+  recreate `PlaybackService`; the recreated player is empty, so every transport button became a
+  silent no-op and the UI still looked like it was playing. The plugin now remembers the queue,
+  the current index and the position, and re-applies them as soon as a fresh `MediaController`
+  connects.
+- **One source of truth for "should the service stay alive".** `onTaskRemoved` no longer
+  re-implements Media3's keep-or-stop decision and calls `stopSelf()` on its own narrower
+  verdict; the decision is delegated to `MediaSessionService` and the service is declared
+  `android:stopWithTask="false"`.
+- **Stops that raise no error are now visible in logcat.** `CinematicPlayback` logs
+  `playWhenReady` together with its change reason, including `AUDIO_FOCUS_LOSS` and
+  `AUDIO_BECOMING_NOISY` — the two ways ExoPlayer stops audio without ever producing a
+  `PlaybackException`, which is exactly what a "the music just stopped" report looks like.
+
+Verified in this environment (JDK 21, Android SDK 36, Node 26):
+
+```bash
+npm test
+npm run build
+npx cap sync android
+cd android && ./gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest
+```
+
+- `npm test`: JavaScript and source-contract suites pass, including the new contracts that the
+  permission prompt is gone, that task removal is delegated to Media3, and that a reconnected
+  service gets its queue back.
+- `testDebugUnitTest`, `assembleDebug` and `assembleDebugAndroidTest`: pass locally.
+- The device tests below are **compiled, not executed** here: this environment has no emulator
+  (no KVM access) and no attached phone.
+
+### Device tests added
+
+Run these on the phone with `cd android && ./gradlew connectedDebugAndroidTest`, or selectively:
+
+```bash
+adb shell am instrument -w -e class com.personal.cinematicmusic.PlaybackServiceInstrumentedTest \
+  com.personal.cinematicmusic.test/androidx.test.runner.AndroidJUnitRunner
+adb shell am instrument -w -e class com.personal.cinematicmusic.SafContentUriInstrumentedTest \
+  com.personal.cinematicmusic.test/androidx.test.runner.AndroidJUnitRunner
+adb shell am instrument -w -e class com.personal.cinematicmusic.PlaybackPipelineInstrumentedTest \
+  com.personal.cinematicmusic.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+- `PlaybackServiceInstrumentedTest` binds a real `MediaController` to the real `PlaybackService`
+  with the same `SessionToken` the plugin uses. `playbackKeepsAdvancingPastOneSecond` is the
+  regression test for the reported failure: a generated six-second tone must keep advancing and
+  stay playing past one and three seconds with no `PlaybackException`.
+  `queueSurvivesAControllerReconnect` releases the controller, reconnects, and asserts the
+  service still holds the queue.
+- `SafContentUriInstrumentedTest` plays a real `content://` URI served by a test-only
+  `ContentProvider` (crossing an app boundary like a SAF grant does), once through a bare
+  `ExoPlayer` and once through the production controller → service path, both past one second.
+- `PlaybackPipelineInstrumentedTest` covers prepare/play/pause/resume/end, the MediaSession
+  mirror and the missing-file error.
+
+### Capturing the one-second stop on the phone
+
+```bash
+adb logcat -c
+adb logcat -v time > cinematic-music-full.txt      # full buffers
+adb logcat -s CinematicPlayback CinematicAudio     # filtered, second shell
+```
+
+The line to look for is `playWhenReady=false reason=…` in `CinematicPlayback`:
+
+- `AUDIO_FOCUS_LOSS` — another app or the system took audio focus.
+- `AUDIO_BECOMING_NOISY` — the audio route was lost (unplugged headset, route switch).
+- `isPlaying=false state=…` with no `playback error` from `CinematicAudio` — the player paused
+  rather than failed, so the cause is above the decoder and not in the file.
+
+Scenarios: play a local file for 30 s, press Home, switch apps, lock the screen, open the
+notification shade, return to the app, then dismiss the task.
